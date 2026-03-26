@@ -1,0 +1,142 @@
+[
+  {
+    "code": "INR",
+    "symbol": "₹",
+    "name": "Indian Rupee",
+    "divisor": 100,
+    "decimals": 2,
+    "smallest_unit": "paise",
+    "locale": "en-IN",
+    "regions": ["IN"]
+  },
+  {
+    "code": "USD",
+    "symbol": "$",
+    "name": "US Dollar",
+    "divisor": 100,
+    "decimals": 2,
+    "smallest_unit": "cents",
+    "locale": "en-US",
+    "regions": ["US"]
+  },
+  {
+    "code": "EUR",
+    "symbol": "€",
+    "name": "Euro",
+    "divisor": 100,
+    "decimals": 2,
+    "smallest_unit": "cents",
+    "locale": "de-DE",
+    "regions": ["DE", "FR", "IT", "ES", "NL", "BE", "PT", "FI", "AT"]
+  },
+  {
+    "code": "GBP",
+    "symbol": "£",
+    "name": "British Pound",
+    "divisor": 100,
+    "decimals": 2,
+    "smallest_unit": "pence",
+    "locale": "en-GB",
+    "regions": ["GB"]
+  },
+  {
+    "code": "AED",
+    "symbol": "د.إ",
+    "name": "UAE Dirham",
+    "divisor": 100,
+    "decimals": 2,
+    "smallest_unit": "fils",
+    "locale": "ar-AE",
+    "regions": ["AE"]
+  },
+  {
+    "code": "SGD",
+    "symbol": "S$",
+    "name": "Singapore Dollar",
+    "divisor": 100,
+    "decimals": 2,
+    "smallest_unit": "cents",
+    "locale": "en-SG",
+    "regions": ["SG"]
+  },
+  {
+    "code": "AUD",
+    "symbol": "A$",
+    "name": "Australian Dollar",
+    "divisor": 100,
+    "decimals": 2,
+    "smallest_unit": "cents",
+    "locale": "en-AU",
+    "regions": ["AU"]
+  },
+  {
+    "code": "JPY",
+    "symbol": "¥",
+    "name": "Japanese Yen",
+    "divisor": 1,
+    "decimals": 0,
+    "smallest_unit": "yen",
+    "locale": "ja-JP",
+    "regions": ["JP"]
+  },
+  {
+    "code": "CAD",
+    "symbol": "C$",
+    "name": "Canadian Dollar",
+    "divisor": 100,
+    "decimals": 2,
+    "smallest_unit": "cents",
+    "locale": "en-CA",
+    "regions": ["CA"]
+  },
+  {
+    "code": "KWD",
+    "symbol": "د.ك",
+    "name": "Kuwaiti Dinar",
+    "divisor": 1000,
+    "decimals": 3,
+    "smallest_unit": "fils",
+    "locale": "ar-KW",
+    "regions": ["KW"]
+  },
+  {
+    "code": "SAR",
+    "symbol": "﷼",
+    "name": "Saudi Riyal",
+    "divisor": 100,
+    "decimals": 2,
+    "smallest_unit": "halalah",
+    "locale": "ar-SA",
+    "regions": ["SA"]
+  },
+  {
+    "code": "QAR",
+    "symbol": "﷼",
+    "name": "Qatari Riyal",
+    "divisor": 100,
+    "decimals": 2,
+    "smallest_unit": "dirham",
+    "locale": "ar-QA",
+    "regions": ["QA"]
+  },
+  {
+    "code": "MYR",
+    "symbol": "RM",
+    "name": "Malaysian Ringgit",
+    "divisor": 100,
+    "decimals": 2,
+    "smallest_unit": "sen",
+    "locale": "ms-MY",
+    "regions": ["MY"]
+  },
+  {
+    "code": "NZD",
+    "symbol": "NZ$",
+    "name": "New Zealand Dollar",
+    "divisor": 100,
+    "decimals": 2,
+    "smallest_unit": "cents",
+    "locale": "en-NZ",
+    "regions": ["NZ"]
+  }
+]

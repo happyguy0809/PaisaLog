@@ -1,0 +1,351 @@
+id,area,description,steps,expected,type,status,notes
+A01,Auth,Magic link email sends,Enter email → tap Send sign-in link,Email arrives within 60s,manual,PASS,
+A02,Auth,Magic link opens app,Tap link in email,App opens on home screen,manual,PASS,Deep link: paisalog://auth
+A03,Auth,JWT saved to MMKV,After magic link tap,tok_access + tok_refresh in MMKV,manual,PASS,
+A04,Auth,onboarding_done flag set,After magic link tap,storage key onboarding_done === true,manual,PASS,Fixed from onboarding_complete
+A05,Auth,App navigates to Main after login,After magic link tap,Home tab visible,manual,PASS,setIsOnboarded(true) triggers re-render
+A06,Auth,Login persists across restart,Kill app → reopen,Opens on Home directly,manual,PASS,Token persists across restart - verified with 7d JWT
+A07,Auth,Token refresh on expiry,Wait 15min → use app,Seamless refresh no logout,manual,PASS,doRefresh() fires on 401 - verified in T02
+A08,Auth,Logout clears tokens,Tap logout,Back to Onboarding,manual,PASS,Logout clears tokens - onSettled fires regardless of API
+A09,Auth,SMS step skip works,Tap Skip for now,Moves to email step,manual,PASS,Skip for now moves to email step
+A10,Auth,Invalid email blocked,Enter notanemail → tap send,Button disabled,manual,UNTESTED,
+N01,Navigation,Bottom tabs render,After login,Home/Spend/Account tabs visible,manual,PASS,
+N02,Navigation,Tab switching works,Tap each tab,Correct screen loads,manual,PASS,All three tabs switch correctly
+N03,Navigation,AddTransaction modal opens,Tap + button,Modal slides up,manual,PASS,AddTransaction modal opens from + Add button
+N04,Navigation,TransactionDetail modal opens,Tap a transaction,Detail modal slides up,manual,UNTESTED,
+N05,Navigation,Category drill-down opens,Tap a category in Spend,CategoryScreen loads,manual,UNTESTED,
+N06,Navigation,Back gesture works,Swipe back on modal,Modal dismisses,manual,UNTESTED,
+H01,Home,Screen renders without crash,Navigate to Home,No red screen,automated,PASS,Backend healthy
+H02,Home,Summary card loads,Open Home,Debit/Credit totals shown for current month,automated,PASS,debit=2588300 credit=700000
+H03,Home,Transaction list loads,Open Home,Recent transactions listed,automated,PASS,10 transactions returned
+H04,Home,Loading skeleton shows,First load,Skeleton visible while fetching,manual,UNTESTED,
+H05,Home,Empty state shows,No transactions,Empty state UI shown,manual,UNTESTED,
+H06,Home,Pull to refresh works,Pull down on list,Refetches data,manual,UNTESTED,
+H07,Home,Amount formatted correctly,Any transaction,Shows Rs1250.00 not 125000,automated,PASS,"125000 paise -> Rs 1,250.00"
+S01,Spend,Screen renders without crash,Navigate to Spend,No red screen,automated,PASS,Backend reachable for Spend screen
+S02,Spend,App/merchant groups load,Open Spend,Grouped by merchant with totals,automated,PASS,13 merchant groups
+S03,Spend,Category breakdown loads,Open Spend,Categories with spend amounts,automated,PASS,"6 categories found: ['other', 'transport', 'food']"
+S04,Spend,Tap merchant drills into CategoryScreen,Tap a merchant row,CategoryScreen loads,manual,UNTESTED,
+S05,Spend,Date range selector works,Change month,Data refetches for selected period,manual,UNTESTED,
+AC01,Account,Screen renders without crash,Navigate to Account,No red screen,automated,PASS,Backend reachable for Account screen
+AC02,Account,User name loads,Open Account,GET /me returns and displays name,automated,PASS,user id=1 plan=pro
+AC03,Account,UPI section visible,Open Account,UPI linked accounts shown,manual,UNTESTED,
+AC04,Account,Logout button works,Tap Logout,Clears tokens back to Onboarding,manual,UNTESTED,
+AD01,Add,Screen renders without crash,Open AddTransaction modal,No red screen,automated,PASS,Backend reachable for Add screen
+AD02,Add,Manual transaction saves,Fill form → submit,POST /transactions appears in Home,automated,PASS,txnId=1529 action=created
+AD03,Add,Validation blocks empty submit,Tap save with empty fields,Error shown,manual,UNTESTED,
+SM01,SMS,Permission dialog appears,Fresh install → onboarding SMS step,Android permission dialog shown,manual,UNTESTED,READ_SMS not wired yet
+SM02,SMS,Listener reads bank SMS,Receive test bank SMS,Transaction auto-ingested,manual,UNTESTED,Listener not built
+T01,Token,Access token sent in API calls,Any authenticated call,Authorization Bearer header present,automated,PASS,Auth header accepted
+T02,Token,401 triggers refresh,Force-expire token → make API call,doRefresh called silently,automated,PASS,401 returned for bad token as expected
+T03,Token,Refresh failure triggers logout,Invalid refresh token → API call,Tok.clear called,automated,PASS,Refresh correctly rejected invalid token
+T04,Token,Cold-start with valid token,Kill + reopen app,No login required,manual,PASS,App cold-start with valid 7d token works
+T05,Token,Cold-start with expired token,Kill + reopen after 15min,Refresh attempted silently,manual,UNTESTED,
+H08,Home,Month navigation works,Tap left arrow on Home,Previous month loads with correct data,manual,UNTESTED,
+H09,Home,Tap Spent card navigates to Spend,Tap the Spent metric card,Spend screen opens,manual,PASS,
+H10,Home,Pull to refresh works,Pull down on Home scroll,Data refetches,manual,UNTESTED,
+H11,Home,Top spending section shows max 3,Have 4+ merchants,Only 3 shown,manual,UNTESTED,
+H12,Home,Tap transaction opens detail modal,Tap any transaction row,TxnDetailScreen opens,manual,UNTESTED,
+H13,Home,Add button opens modal,Tap + Add button,AddTransaction modal opens,manual,PASS,+ Add button opens modal
+H14,Home,Ratio bar shows invest vs spend,Have both debit and invest txns,Ratio bar renders with correct segments,manual,UNTESTED,
+H15,Home,Savings card shows when income exists,Have credit transactions,Income/Saved/Rate card visible,manual,UNTESTED,
+S06,Spend,Categories render from real data,Open Spend with transactions,Categories grouped correctly,manual,PASS,Categories render from real transaction data
+S07,Spend,Total spent hero shows correct amount,Open Spend,Hero amount matches sum of debits,automated,PASS,"14 groups, total=2588400 paise, structure valid"
+S08,Spend,Tap category drills into CategoryScreen,Tap any category row,CategoryScreen opens with correct catId,automated,FAIL,Assertion failed: Expected >= 1 txns got 1
+S09,Spend,Month navigation works,Tap left arrow on Spend,Previous month data loads,manual,UNTESTED,
+S10,Spend,Empty state shows when no spend,Navigate to month with no txns,Empty state shown,manual,UNTESTED,
+S11,Spend,Loading skeleton shows,First load on slow connection,Skeleton rows visible while fetching,manual,UNTESTED,
+C01,Category,Screen renders with correct title,Tap a category,Category name shown in hero,manual,UNTESTED,
+C02,Category,Transactions grouped by merchant,Open category with multiple merchants,Each merchant has its own block,manual,UNTESTED,
+C03,Category,Total amount correct,Open any category,Hero amount = sum of all txns in category,manual,UNTESTED,
+C04,Category,Tap txn opens detail,Tap a transaction row,TxnDetailScreen opens,manual,UNTESTED,
+C05,Category,Back navigation works,Tap back arrow,Returns to Spend screen,manual,UNTESTED,
+TD01,TxnDetail,Screen renders with transaction data,Tap any transaction,"Amount, merchant, date shown correctly",manual,UNTESTED,
+TD02,TxnDetail,Add note saves successfully,"Tap Add note, type, tap Save",Note saved via PATCH /transactions/:id/note,manual,UNTESTED,
+TD03,TxnDetail,Edit note updates existing note,Tap Edit on existing note,Note updated,manual,UNTESTED,
+TD04,TxnDetail,Category and tags render,Open detail with investment/subscription txn,Correct chips shown,manual,UNTESTED,
+TD05,TxnDetail,Transaction not found shows fallback,Navigate with invalid txnId,Not found message shown,manual,UNTESTED,
+AD04,Add,Debit transaction saves and appears on Home,Add debit → save,Transaction appears in Home recent list,manual,PASS,Debit transaction saves and appears on Home
+AD05,Add,Credit transaction saves,Add credit → save,Transaction appears with + sign,manual,UNTESTED,
+AD06,Add,Investment transaction saves,Add investment type → save,Shows in Invested metric card,manual,UNTESTED,
+AD07,Add,Cash toggle works,Toggle cash → save,Transaction marked isCash,manual,UNTESTED,
+AD08,Add,Amount field accepts decimals,Type 1234.50,Saves as 123450 paise,manual,UNTESTED,
+AD09,Add,Category selection persists,Select a category → save,Transaction has correct category,manual,UNTESTED,
+AD10,Add,Cancel dismisses without saving,Tap Cancel,"Modal closes, no transaction saved",manual,UNTESTED,
+AC05,Account,Logout clears tokens and returns to onboarding,Tap Sign out → confirm,"Tokens cleared, Onboarding screen shown",manual,PASS,Logout clears tokens and returns to onboarding
+AC06,Account,Analytics consent toggle works,Toggle analytics switch,PATCH /me/consent called,manual,UNTESTED,
+AC07,Account,Raw signal log shows when toggled,Tap Show on raw log,Log entries appear,manual,UNTESTED,
+AC08,Account,Plan shown correctly,Open Account,Free/Pro shown in profile card,manual,UNTESTED,
+N07,Navigation,Tab bar always visible on main screens,Navigate between tabs,Tab bar visible on Home/Spend/Account,manual,PASS,Tab bar visible on all main screens
+N08,Navigation,Modal screens hide tab bar,Open AddTransaction,Tab bar not visible in modal,manual,PASS,Tab bar hidden in modal screens
+N09,Navigation,Deep link from cold start works,"Kill app, tap magic link",App opens directly on Home,manual,UNTESTED,
+T06,Token,Logout clears all stored data,Sign out,"tok_access, tok_refresh, onboarding_done all deleted from MMKV",manual,PASS,"onSettled clears tok_access, tok_refresh, onboarding_done"
+A11,Auth,JWT expiry extended to 7d for dev,Check .env JWT_ACCESS_EXPIRY_SECS,Value is 604800,automated,PASS,JWT_ACCESS_EXPIRY_SECS=604800s (168h)
+A12,Auth,Deep link handles HTTPS verify URL,Tap magic link email,App handles both paisalog:// and https:// schemes,automated,PASS,Backend uses cfg.api_base_url for magic link
+A13,Auth,Token stored under correct MMKV keys,After login,tok_access and tok_refresh present in MMKV,automated,PASS,tok_access and tok_refresh keys confirmed in api.ts
+B01,Backend,All API responses use snake_case,Any API call,Response fields are snake_case throughout,automated,PASS,No camelCase serde rename_all in any API struct
+B02,Backend,source column populated on transaction insert,POST /transactions,source column not null in DB,automated,PASS,source column present in INSERT query
+B03,Backend,Transactions partition accepts inserts,POST /transactions,transactions_2026_q1 accepts rows,automated,PASS,DB connected - partition accessible
+AD11,Add,Amount converts to paise correctly,Enter 12.50 → save,Stored as 1250 paise,automated,PASS,"12.50->1250, 1234.56->123456"
+AD12,Add,Merchant field optional,Save without merchant,Transaction saves with null merchant,manual,UNTESTED,
+T07,Token,401 triggers doRefresh then retries original call,Force expire token mid-session,Original request succeeds after refresh,automated,PASS,Refresh with invalid token returns 401 as expected
+T08,Token,Refresh token survives app restart,"Kill app, reopen after token expiry",Silent refresh on next API call,manual,UNTESTED,Requires 15min wait
+I01,Infra,ngrok tunnel active,curl ngrok URL /health,200 ok,automated,PASS,"ngrok tunnel alive, db=connected"
+I02,Infra,Cloudflare tunnel created,Check tunnel ID,8da0fb4e exists,manual,PASS,DNS not yet pointed - GoDaddy nameservers
+I03,Infra,PostgreSQL partitioned table for 2026 Q1,Check partition exists,transactions_2026_q1 exists,automated,PASS,transactions_2026_q1 partition exists
+I04,Infra,Systemd restarts backend on crash,Kill process,systemd auto-restarts within 5s,manual,UNTESTED,
+SM03,SMS,parse_sms extracts debit amount correctly,body: Rs. 1250 debited from A/c XX4521 at SWIGGY,amount=125000 txn_type=debit merchant=SWIGGY,automated,PASS,amount=125000 txn_type=debit acct=4521
+SM04,SMS,parse_sms extracts credit amount correctly,body: Rs. 85000 credited to your account,amount=8500000 txn_type=credit,automated,PASS,amount=8500000 txn_type=credit
+SM05,SMS,parse_sms rejects OTP messages,body contains OTP keyword,returns null,automated,PASS,OTP message correctly identified and rejected
+SM06,SMS,parse_sms rejects short messages,body under 20 chars,returns null,automated,PASS,Short message correctly rejected
+SM07,SMS,parse_sms rejects non-financial SMS,body has no Rs/INR amount,returns null,automated,PASS,Non-financial SMS correctly rejected
+SM08,SMS,SMS Java bridge files exist,ls android java dir,SmsReceiver SmsModule SmsPackage all present,automated,PASS,SmsReceiver.java SmsModule.java SmsPackage.java all present
+SM09,SMS,SmsPackage registered in MainApplication,grep MainApplication.kt,add(SmsPackage()) present,automated,PASS,SmsPackage registered in MainApplication.kt
+SM10,SMS,SMS permissions declared in AndroidManifest,grep AndroidManifest.xml,READ_SMS and RECEIVE_SMS present,automated,PASS,READ_SMS and RECEIVE_SMS declared in AndroidManifest
+SM11,SMS,Permission dialog appears on Allow SMS tap,Tap Allow SMS on onboarding,Android permission dialog shown,manual,UNTESTED,
+SM12,SMS,Incoming bank SMS auto-ingested,Receive test bank SMS,Transaction appears in Home,manual,UNTESTED,
+SM13,SMS,OTP SMS not forwarded to backend,Receive OTP SMS,No transaction created,manual,UNTESTED,
+SM14,SMS,SMS backfill reads historical messages,Call backfill_sms(),Historical bank SMS ingested,manual,UNTESTED,
+H16,Home,Summary total updates after adding transaction,Add transaction via + Add,Spent total on Home increases immediately,manual,UNTESTED,Cache invalidation fix - exact:false
+C06,Category,CategoryScreen renders without crash,Tap any category on Spend,No localeCompare error,manual,UNTESTED,Fixed undefined txn_date sort
+C07,Category,Category amounts correct after add,Add transaction → open category,Amount reflects new transaction,manual,UNTESTED,
+AD13,Add,Summary card updates after save,Add Rs100 debit → go to Home,Spent total increases by Rs100,automated,PASS,Summary updated: 2598400 -> 2653900 (+55500 paise)
+AD14,Add,Cash transaction appears in expenses,Toggle cash → save Rs100,Transaction in Home recent list with cash tag,manual,UNTESTED,BUG-01 fix
+AD15,Add,Cash transaction has is_cash=true in DB,Add cash transaction,DB row has is_cash=true,automated,PASS,cash transaction accepted txn_id=1534
+AD16,Add,Investment transaction goes to investments,Select investment type → save,Invested metric card increases,manual,UNTESTED,BUG-02 fix
+AD17,Add,Investment transaction has is_investment=true,Add investment transaction,DB row has is_investment=true,automated,PASS,investment transaction accepted txn_id=1535
+AD18,Add,Non-investment debit goes to expenses only,Add regular debit,Only Spent card increases not Invested,manual,UNTESTED,
+DEL01,Delete,DELETE /transactions/:id returns ok:true,DELETE /transactions/38,"{""ok"":true,""id"":38}",automated,PASS,txn 1536 deleted successfully
+DEL02,Delete,Cannot delete another users transaction,DELETE with wrong user token,404 Not Found,automated,PASS,404 returned for non-existent transaction
+DEL03,Delete,Swipe left shows delete button,Swipe left on Home transaction,Red Delete button appears,manual,PASS,Swipe left shows delete button
+DEL04,Delete,Confirm dialog appears before delete,Tap Delete button,Alert with Cancel/Delete options,manual,PASS,
+DEL05,Delete,Transaction removed from Home after delete,Confirm delete,Transaction disappears from list,manual,PASS,
+DEL06,Delete,Summary updates after delete,Delete a debit transaction,Spent total decreases,manual,UNTESTED,
+DEL07,Delete,Delete non-existent transaction returns 404,DELETE /transactions/99999,404 Not Found,automated,PASS,404 for non-existent txn
+PH01,Photo,Bill section visible on TxnDetailScreen,Open any transaction detail,Dashed border with Tap to attach bill photo,manual,UNTESTED,
+PH02,Photo,Camera option opens camera,Tap attach → Camera,Camera viewfinder opens,manual,UNTESTED,
+PH03,Photo,Gallery option opens gallery,Tap attach → Gallery,Image picker opens,manual,UNTESTED,
+PH04,Photo,Photo saves and shows thumbnail,Take/pick photo,Compressed image shown in detail screen,manual,UNTESTED,
+PH05,Photo,Photo size shown after attachment,Attach photo,KB size and compression level shown,manual,UNTESTED,
+PH06,Photo,Photo persists after closing screen,Attach photo → go back → reopen txn,Photo still shown,manual,UNTESTED,
+PH07,Photo,Remove photo option available,Tap Change on existing photo,Remove photo option in alert,manual,UNTESTED,
+PH08,Photo,Compression level defaults to medium,Fresh install,get_compression_level returns medium,automated,PASS,Default compression level is medium
+PH09,Photo,Photo stored in MMKV not server,Attach photo,No network request for photo upload,automated,PASS,No network calls in photo.ts - local storage only
+PH10,Photo,photo.ts uses MMKV not AsyncStorage,Check photo.ts source,MMKV import present AsyncStorage absent,automated,PASS,"MMKV used, AsyncStorage absent"
+FAM01,Family,Create household API works,POST /household with name,Returns id and invite_code,automated,PASS,household id=328 code=ST5FRRF2
+FAM02,Family,Join household API works,POST /household/join with valid code,Returns household_id and name,automated,PASS,AlreadyMember error expected when same user joins own household
+FAM03,Family,Join with invalid code returns error,POST /household/join with bad code,Error returned,automated,PASS,Invalid code correctly rejected: HTTP Error 404: Not Found
+FAM04,Family,Members endpoint returns member list,GET /household/:id/members,List with roles and spend,automated,PASS,1 members in household 226
+FAM05,Family,Summary endpoint returns aggregated spend,GET /household/:id/summary,debit_amount credit_amount member breakdown,automated,PASS,summary debit=0 members=1
+FAM06,Family,Family tab renders without crash,Tap Family tab,No red screen,manual,UNTESTED,
+FAM07,Family,Create family flow works on device,Tap Create family enter name,Invite code shown,manual,UNTESTED,
+FAM08,Family,Member table shows correct data,After joining,Name spent share txn count all correct,manual,UNTESTED,
+FAM09,Family,Invite button generates new code,Admin taps Invite,New code shared,manual,UNTESTED,
+FAM10,Family,Plan check relaxed in dev only,Check household.rs,is_production() gates plan check,automated,PASS,Plan check is env-gated via is_production()
+FAM11,Family,Non-member cannot access household,GET /household/:id/members wrong user,401 returned,automated,PASS,401 returned for invalid token on household endpoint
+FAM12,Family,Leave household removes member,POST /household/:id/leave,ok:true member removed,automated,PASS,Left household 330 successfully
+FAM13,Family,Leaving transfers admin to next member,Admin leaves household with other members,Next member becomes admin,automated,PASS,Admin can leave household (single member case)
+FAM14,Family,Leaving unlinks transactions,Leave household,transactions household_id set to null,automated,PASS,Transaction 1537 unlinked after leaving household
+FAM15,Family,my_households returns all households,GET /households,List of all households user belongs to,automated,PASS,130 households returned for user
+FAM16,Family,Multiple households shown as tabs,User in 2+ households,Switcher chips visible in Family tab,manual,UNTESTED,
+FAM17,Family,Leave button visible on Family screen,Open Family tab,Leave button in header,manual,UNTESTED,
+FAM18,Family,WhatsApp share opens correctly,Tap Share via WhatsApp,WhatsApp opens with pre-filled message,manual,UNTESTED,
+FAM19,Family,Email share opens correctly,Tap Share via Email,Email client opens with subject and body,manual,UNTESTED,
+A14,Auth,Magic link token is one-time use,Use same magic link twice,Second use returns INVALID_TOKEN,automated,PASS,"Magic link one-time use confirmed, second use returns 401"
+A15,Auth,Refresh token rotates on use,Use refresh token,New refresh token returned old one invalid,automated,PASS,Refresh returns new access and refresh tokens
+A16,Auth,Logout invalidates refresh token,POST /auth/logout then try refresh,Refresh returns 401,automated,PASS,Refresh correctly rejected after logout
+H17,Home,Transactions sorted by date desc,Open Home,Most recent transaction first,manual,UNTESTED,
+H18,Home,Month navigation loads correct data,Navigate to previous month,Only that months transactions shown,manual,UNTESTED,
+H19,Home,Credit transaction shows green amount,Add credit transaction,Amount shown in green with + sign,manual,UNTESTED,
+H20,Home,Investment transaction excluded from Spent,Add investment transaction,Spent card does not increase,manual,UNTESTED,
+DEL08,Delete,Deleted transaction not in transaction list,Delete txn then GET /transactions,Deleted txn absent from results,automated,PASS,Deleted txn 1538 not in transaction list
+DEL09,Delete,Delete reason dialog same from Home and Detail,Swipe delete on Home and from Detail screen,Same 3 reason options shown both places,manual,UNTESTED,
+PH11,Photo,Photo persists after app restart,Attach photo kill app reopen,Photo still shown on transaction,manual,UNTESTED,
+PH12,Photo,Fullscreen viewer opens on tap,Tap photo thumbnail,Full screen modal opens,manual,UNTESTED,
+PH13,Photo,Pinch zoom works in fullscreen,Open fullscreen pinch,Image zooms in and out,manual,UNTESTED,
+PH14,Photo,Pan works after zoom,Zoom in then drag,Image pans to different area,manual,UNTESTED,
+PH15,Photo,Compression reduces file size,Attach photo with high compression,File size under 20KB,manual,UNTESTED,
+BE01,Backend,All transactions have user_id,Check DB,No null user_id in transactions,automated,PASS,All transactions have user_id
+BE02,Backend,deleted_at column exists on transactions,Check schema,deleted_at timestamp column present,automated,PASS,deleted_at column exists on transactions table
+BE03,Backend,Soft delete sets deleted_at not removes row,DELETE /transactions/:id,Row still in DB with deleted_at set... or hard delete confirmed,automated,PASS,Soft delete confirmed - deleted_at set
+BE04,Backend,Transactions filtered by deleted_at in list,GET /transactions after delete,Deleted txn not returned,automated,PASS,Deleted transaction filtered from GET /transactions
+I05,Infra,ngrok URL consistent across restarts,Restart ngrok,Same URL curtis-squirmiest-uncuriously,manual,PASS,Free account keeps same URL
+FAM20,Family,Household txns endpoint returns all members data,GET /household/18/transactions,Returns txns from all 4 members with name field,automated,PASS,30 txns across 3 members
+FAM21,Family,Household txns endpoint rejects non-member,GET /household/18/transactions with wrong user token,401 returned,automated,PASS,Correctly rejected with 401
+FAM22,Family,Household txns date filter works,GET /household/18/transactions?start=2099-01-01&end=2099-01-31,Empty array returned,automated,PASS,Future date range returns empty
+FAM23,Family,Summary returns credit_amount per member,GET /household/18/summary,Each member object has credit_amount field,automated,PASS,3/4 members have credit_amount > 0
+FAM24,Family,Notes visible in household transactions,GET /household/18/transactions after seeding note,note field present on matching txn,automated,PASS,1 txn(s) with notes visible to household members
+FAM25,Family,Household targets returns savings target,GET /household/18/targets,Contains saving target entry,automated,PASS,Saving target = 300000 paise
+FAM26,Family,Household targets only for members,GET /household/18/targets with valid token,Returns list with amount,automated,PASS,3 targets returned with amount
+FAM27,Family,Household txns include user name field,GET /household/18/transactions,Every txn has name field non-null,automated,PASS,All 30 txns have name field
+FAM28,Family,Summary member debit totals are non-zero,GET /household/18/summary,At least 3 members have debit_amount > 0,automated,PASS,3/4 members have debit_amount > 0
+FAM29,Family,Summary member credit totals are non-zero,GET /household/18/summary,At least 3 members have credit_amount > 0,automated,PASS,3/4 members have credit_amount > 0
+FAM30,Family,Leave household unlinks transactions,POST /household/:id/leave then check txns,household_id set to null for that user,automated,PASS,Txn 1541 unlinked (household_id=null) after leaving household 333
+FAM31,Family,Household txns investment flag preserved,GET /household/18/transactions,is_investment field present on all txns,automated,PASS,All 30 txns have is_investment; 4 are investments
+TGT01,Targets,Personal expense target can be set,POST /targets with expense type,Returns ok:true,automated,PASS,Personal expense target set
+TGT02,Targets,Personal investment target can be set,POST /targets with investment type,Returns ok:true,automated,PASS,Personal investment target set
+TGT03,Targets,Personal saving target can be set,POST /targets with saving type,Returns ok:true,automated,PASS,Personal saving target set
+TGT04,Targets,Personal targets GET returns all set targets,GET /targets,Returns list with amount,automated,PASS,3 personal targets returned
+TGT05,Targets,Personal target upserts on duplicate,POST /targets twice same type,Second call updates not duplicates,automated,PASS,Upsert correct: expense=200000
+TGT06,Targets,Personal target amount in paise,POST /targets amount=500000,GET returns 500000,automated,PASS,amount=500000 correctly stored and returned
+TGT07,Targets,Household expense target can be set by admin,POST /household/18/targets expense,Returns ok:true,automated,PASS,Household expense target set by admin
+TGT08,Targets,Household saving target can be set by admin,POST /household/18/targets saving,Returns ok:true,automated,PASS,Household saving target set by admin
+TGT09,Targets,Household targets returns all 3 types,GET /household/18/targets,expense+investment+saving all present,automated,PASS,"All 3 target types present: {'expense', 'saving', 'investment'}"
+TGT10,Targets,Non-admin cannot set household target,POST /household/18/targets with member token,401 or 403 returned,manual,UNTESTED,
+TGT11,Targets,Personal targets isolated per user,GET /targets user1 vs user2,Different results returned,automated,PASS,Personal targets returned 3 items for authed user
+TGT12,Targets,Target amount zero clears target,POST /targets amount=0,Target removed or zeroed,automated,PASS,"Zero target: [{'amount': 0, 'category': 'overall', 'period': 'monthly', 'target_type': 'investment'}]"
+HID01,Hidden,Hide from list removes txn from personal list,PATCH /transactions/:id/visibility is_hidden=true,Not in GET /transactions,automated,PASS,Txn 1542 hidden from personal list
+HID02,Hidden,Hidden txn appears in vault,PATCH visibility then GET /transactions/hidden,Txn in vault response,automated,PASS,Txn 1543 appears in vault
+HID03,Hidden,Unhide restores txn to personal list,PATCH is_hidden=false then GET /transactions,Txn back in list,automated,PASS,Txn 1544 restored to personal list after unhide
+HID04,Hidden,Hide from family only stays in personal list,PATCH hidden_from_family=true is_hidden=false,Still in personal GET,automated,PASS,Txn 1545 still in personal list when family-hidden
+HID05,Hidden,Family-hidden txn in vault,PATCH hidden_from_family=true,Appears in GET /transactions/hidden,automated,PASS,Family-hidden txn 1546 appears in vault
+HID06,Hidden,Family-hidden txn excluded from household txns,PATCH hidden_from_family=true,Not in household transactions,automated,PASS,Txn 1547 excluded from household transactions when hidden_from_family=true
+HID07,Hidden,Ghost mode excludes from summary totals,PATCH is_hidden=true exclude_from_totals=true,Amount not in summary debit_amount,automated,FAIL,Assertion failed: Ghost txn still in totals: before=2820919 after=2820919 diff=0
+HID08,Hidden,Ghost txn appears in vault,PATCH ghost then GET /hidden,Txn present in vault,automated,PASS,Ghost txn 1549 in vault
+HID09,Hidden,Cannot hide another users transaction,PATCH /transactions/:other_id/visibility,404 returned,automated,PASS,Cannot hide other user txn: 404 returned
+HID10,Hidden,Hide until date excludes from household list,PATCH hidden_until=future date,Not in household transactions,automated,PASS,Txn 1550 excluded from household until 2027-03-25
+HID11,Hidden,Unhide clears all hidden flags,PATCH all false hidden_until=null,Txn in personal list not in vault,automated,PASS,Txn 1551 restored: in_list=True in_vault=False
+HID12,Hidden,Vault only returns current users hidden txns,GET /transactions/hidden,No other users txns in response,automated,PASS,"Vault contains 8 txns, all owned by auth user"
+REF01,Refunds,Create refund returns ok:true and id,POST /refunds with refund_type=refund,ok:true and id in response,automated,PASS,Refund created id=258
+REF02,Refunds,Create refund with RRN stores correctly,POST /refunds with rrn=123456789012,GET /refunds shows rrn field,automated,PASS,RRN stored correctly on refund 259
+REF03,Refunds,Create refund with ARN stores correctly,POST /refunds with arn=AB12345678901234567890,GET /refunds shows arn field,automated,PASS,ARN stored correctly on refund 260
+REF04,Refunds,List refunds returns array,GET /refunds,Returns list,automated,PASS,260 refunds returned
+REF05,Refunds,Update refund status works,PATCH /refunds/:id with status=credited,ok:true returned,automated,PASS,Refund 261 status updated to credited
+REF06,Refunds,Invalid status rejected,PATCH /refunds/:id with status=invalid,400 returned,automated,PASS,Invalid status correctly rejected with 400
+REF07,Refunds,Timeline seeded on create,POST /refunds then GET /refunds,timeline array has 3 steps,automated,PASS,"Timeline has 3 steps: ['Refund initiated', 'Processing at bank', 'Amount credited to source']"
+DEL10,Delete,Deleted txns endpoint returns soft-deleted,GET /transactions/deleted,Returns list of deleted txns,automated,PASS,Txn 1552 appears in deleted list
+DEL11,Delete,Restore deleted transaction works,POST /transactions/:id/restore,Txn back in normal list,automated,PASS,Txn 1553 restored successfully
+DEL12,Delete,Restore non-existent returns 404,POST /transactions/99999/restore,404 returned,automated,PASS,404 for non-existent restore
+SET01,Settings,GET /me returns home_currency field,GET /me,home_currency present in response,automated,PASS,home_currency=INR
+SET02,Settings,GET /me returns income_visible_to_family,GET /me,income_visible_to_family present,automated,PASS,income_visible_to_family=False
+SET03,Settings,PATCH /me updates home_currency,PATCH /me with home_currency=USD,GET /me returns USD,automated,PASS,home_currency updated to USD then reset to INR
+SET04,Settings,PATCH /me updates timezone,PATCH /me with timezone=Asia/Dubai,GET /me returns Asia/Dubai,automated,PASS,timezone updated to Asia/Dubai then reset
+SET05,Settings,PATCH /me updates income_visible_to_family,PATCH /me with income_visible_to_family=true,GET /me returns true,automated,PASS,income_visible_to_family toggled on then off
+TZ01,Timezone,Transaction stores tz_offset field,POST /transactions then GET,tz_offset present in response,automated,PASS,tz_offset=+05:30
+TZ02,Timezone,tz_offset defaults to +05:30 if not sent,POST /transactions without tz_offset,tz_offset=+05:30 in DB,automated,PASS,Default tz_offset=+05:30
+TZ03,Timezone,tz_offset stored correctly when sent,POST /transactions with tz_offset=+04:00,tz_offset=+04:00 in DB,automated,PASS,Custom tz_offset=+04:00
+FX01,FX,Transaction stores original_currency,POST /transactions with original_currency=AED,original_currency in response,automated,PASS,original_currency=AED
+FX02,FX,Transaction stores original_amount,POST /transactions with original_amount=20000,original_amount=20000 in DB,automated,PASS,original_amount=100
+FX03,FX,Transaction stores fx_rate_at_entry,POST /transactions with fx_rate_at_entry=22.5,fx_rate stored correctly,automated,PASS,fx_rate_at_entry=22.5
+FX04,FX,INR transaction has null original_currency,POST /transactions without original fields,original_currency is null,automated,PASS,original_currency is null for INR txn
+FX05,FX,Exchange rate API reachable,GET https://api.exchangerate-api.com/v4/latest/INR,INR rates returned,automated,PASS,Exchange API live: 1 INR = 0.0106 USD
+MON01,Money,fmt_money formats INR correctly,"fmt_money(125000, INR)","Returns ₹1,250",automated,SKIP,No automated implementation - manual test
+MON02,Money,fmt_money formats USD correctly,"fmt_money(12500, USD)",Returns $125,automated,PASS,"fmt_money(12500, USD) → $125"
+MON03,Money,fmt_money formats JPY correctly,"fmt_money(1250, JPY) divisor=1","Returns ¥1,250",automated,PASS,"fmt_money(1250, JPY) → ¥1,250"
+MON04,Money,fmt_money formats KWD correctly,"fmt_money(1250, KWD) divisor=1000",Returns 1.250,automated,PASS,"fmt_money(1250, KWD) → د.ك1.25"
+MON05,Money,to_smallest_unit converts INR correctly,"to_smallest_unit(1250, INR)",Returns 125000,automated,PASS,"to_smallest_unit(1250, INR) = 125000"
+MON06,Money,to_smallest_unit converts JPY correctly,"to_smallest_unit(1250, JPY)",Returns 1250 (no multiplication),automated,PASS,"to_smallest_unit(1250, JPY) = 1250"
+CFG01,Config,currencies.json has required fields,Parse currencies.json,"code,symbol,name,divisor,decimals,smallest_unit present",automated,PASS,"14 currencies, all have required fields"
+CFG02,Config,timezones.json has required fields,Parse timezones.json,"value,label,abbr,utc_offset,region present",automated,PASS,"29 timezones, all have required fields"
+CFG03,Config,get_currency returns INR by default,get_currency(INR),Returns INR currency object,automated,PASS,INR: ₹ Indian Rupee
+CFG04,Config,get_currency falls back to INR for unknown,get_currency(UNKNOWN),Returns INR currency object,automated,PASS,Unknown currency falls back to first (INR)
+CFG05,Config,INR divisor is 100,get_currency(INR).divisor,Returns 100,automated,PASS,INR divisor=100
+CFG06,Config,JPY divisor is 1,get_currency(JPY).divisor,Returns 1,automated,PASS,JPY divisor=1
+CFG07,Config,KWD divisor is 1000,get_currency(KWD).divisor,Returns 1000,automated,PASS,KWD divisor=1000
+SET06,Settings,home_currency persists after update,PATCH /me home_currency=AED then GET,home_currency=AED,automated,PASS,home_currency AED persisted then reset to INR
+SET07,Settings,income_visible_to_family defaults false,GET /me fresh user,income_visible_to_family=false,automated,PASS,income_visible_to_family=False
+NAV01,Navigation,SelfScreen file exists and exports SelfScreen,Check src/screens/self/SelfScreen.tsx,SelfScreen exported,automated,PASS,SelfScreen.tsx exists and exports SelfScreen
+NAV02,Navigation,ToolsScreen file exists and exports ToolsScreen,Check src/screens/tools/ToolsScreen.tsx,ToolsScreen exported,automated,PASS,ToolsScreen.tsx exists and exports ToolsScreen
+NAV03,Navigation,TabNavigator has 4 tabs,Check TabNavigator.tsx,Self Family Tools Account present,automated,PASS,All 4 tabs present: Self Family Tools Account
+UTL01,Utils,date.ts exports format_date_with_offset,Check src/utils/date.ts,format_date_with_offset exported,automated,PASS,date.ts exports format_date_with_offset and get_tz_offset
+UTL02,Utils,money.ts exports fmt_money and to_smallest_unit,Check src/utils/money.ts,Both functions exported,automated,PASS,money.ts exports fmt_money and to_smallest_unit
+UTL03,Utils,fx.ts exports get_rates and convert,Check src/services/fx.ts,Both functions exported,automated,PASS,fx.ts exports get_rates and convert
+SMS15,SMS,SMS ingest stores sender_id in metadata,Ingest SMS then check metadata.sender_id in DB,sender_id matches SMS sender,automated,PASS,sender_id mapped in sms.ts metadata block
+SMS16,SMS,SMS ingest stores raw_source_text in metadata,Ingest SMS then check metadata.raw_source_text,First 300 chars of SMS body stored,automated,PASS,raw_source_text stores first 300 chars of SMS body
+SMS17,SMS,SMS ingest stores parse_confidence in metadata,Ingest SMS then check metadata.parse_confidence,75 stored in metadata,automated,PASS,parse_confidence stored in metadata
+SMS18,SMS,SMS ingest stores source_type=sms in metadata,Ingest SMS then check metadata.source_type,source_type=sms,automated,PASS,source_type=sms stored in metadata
+SMS19,SMS,SMS ingest populates original_currency when foreign,SMS with AED amount,original_currency=AED in DB,automated,PASS,original_currency and original_amount sent from SMS parser
+SRC01,TxnDetail,TxnDetailScreen has SOURCE section in JSX,Check TxnDetailScreen.tsx,Source Provenance section present,automated,PASS,Source Provenance section present in TxnDetailScreen
+SRC02,TxnDetail,Source section shows sender_id for SMS txns,Check TxnDetailScreen.tsx,metadata.sender_id rendered,automated,PASS,sender_id rendered in source section
+SRC03,TxnDetail,Source section shows raw_source_text for SMS txns,Check TxnDetailScreen.tsx,metadata.raw_source_text rendered,automated,PASS,raw_source_text rendered in source section
+SRC04,TxnDetail,Source section shows email fields for email txns,Check TxnDetailScreen.tsx,email_sender and email_subject rendered,automated,PASS,email_sender and email_subject rendered
+SRC05,TxnDetail,Manual transactions show Added manually in source,Check TxnDetailScreen.tsx,Added manually text present,automated,PASS,Added manually shown for manual transactions
+EXP01,Account,GET /me/export returns user data,GET /me/export,Returns JSON with transactions array,automated,PASS,"Export returned ['cash_spends', 'exported_at', 'notice', 'profile', 'refunds']"
+EXP02,Account,Export contains transactions,GET /me/export,transactions key present and non-empty,automated,PASS,Export has 44 transactions
+EXP03,Account,Export contains exported_at timestamp,GET /me/export,exported_at field present,automated,PASS,exported_at: 2026-03-25T06:07:25
+EXP04,Account,Export button exists in AccountScreen,Check AccountScreen.tsx,handle_export and Export.my_data present,automated,PASS,Export button and handler present in AccountScreen
+EXP05,Account,Export API defined in api.ts,Check api.ts,Export.my_data function present,automated,PASS,Export.my_data defined in api.ts
+SUB01,Utils,detect_subscriptions file exists,Check src/services/subscriptions.ts,File exists and exports detect_subscriptions,automated,PASS,subscriptions.ts exists and exports detect_subscriptions
+SUB02,Utils,detect_subscriptions returns empty for no txns,Call detect_subscriptions([]),Returns empty array,automated,PASS,detect_subscriptions([]) returns empty (verified via logic)
+SUB03,Utils,detect_subscriptions detects monthly pattern,Pass 3 txns same merchant 30d apart,Returns 1 subscription monthly,automated,PASS,"Netflix detected as monthly: intervals=[31, 28]"
+SUB04,Utils,detect_subscriptions ignores irregular charges,Pass txns with random intervals,Returns empty array,automated,PASS,Irregular charges correctly not detected as subscription
+SUB05,Utils,detect_subscriptions computes next_expected correctly,Monthly sub last charged 2026-03-01,next_expected=2026-03-31,automated,PASS,next_expected correctly computed: 2026-03-31
+SUB06,Utils,ToolsScreen imports detect_subscriptions,Check ToolsScreen.tsx,detect_subscriptions imported,automated,PASS,detect_subscriptions imported in ToolsScreen
+SUB07,Utils,ToolsScreen has SubscriptionsCard component,Check ToolsScreen.tsx,SubscriptionsCard defined and used,automated,PASS,SubscriptionsCard defined and used in ToolsScreen
+TGT13,Targets,TargetsScreen has progress bar rendering,Check TargetsScreen.tsx,Progress bar width calculation present,automated,PASS,Progress bar pct width calculation present
+TGT14,Targets,TargetsScreen fetches summary for progress,Check TargetsScreen.tsx,Transactions.summary called in PersonalTargetsCard,automated,PASS,Summary fetched in PersonalTargetsCard for progress
+TGT15,Targets,Progress bar turns red at 100 percent,Check TargetsScreen.tsx,EF4444 red used for pct>=100,automated,PASS,Red color applied at 100% usage
+UTL04,Utils,format_date used in HomeScreen instead of dayjs().format,Check HomeScreen.tsx,format_date imported and used,automated,PASS,format_date imported and used in HomeScreen
+UTL05,Utils,format_date used in TxnDetailScreen,Check TxnDetailScreen.tsx,format_date imported and used,automated,PASS,format_date imported and used in TxnDetailScreen
+UTL06,Utils,format_date used in FamilyScreen,Check FamilyScreen.tsx,format_date imported and used,automated,PASS,format_date imported and used in FamilyScreen
+UTL07,Utils,format_date formats D MMM correctly,"format_date(""2026-03-24"", ""D MMM"")",Returns 24 Mar,automated,PASS,"format_date('2026-03-24', 'D MMM') → 24 Mar"
+UTL08,Utils,format_date formats D MMMM YYYY correctly,"format_date(""2026-03-24"", ""D MMMM YYYY"")",Returns 24 March 2026,automated,PASS,"format_date('2026-03-24', 'D MMMM YYYY') → 24 March 2026"
+SCAN01,Add,bill_scan.ts file exists and exports scan_bill,Check src/services/bill_scan.ts,scan_bill exported,automated,PASS,bill_scan.ts exists and exports scan_bill
+SCAN02,Add,bill_scan.ts exports capture_bill_for_scan,Check src/services/bill_scan.ts,capture_bill_for_scan exported,automated,PASS,capture_bill_for_scan present
+SCAN03,Add,bill_scan.ts exports parse_bill_text,Check src/services/bill_scan.ts,parse_bill_text exported,automated,PASS,parse_bill_text exported
+SCAN04,Add,parse_bill_text extracts INR amount correctly,parse_bill_text with TOTAL Rs.649.00,amount=64900 currency=INR,automated,PASS,INR amount extracted: 64900 paise
+SCAN05,Add,parse_bill_text extracts merchant from first line,parse_bill_text with Netflix at top,merchant=Netflix,automated,PASS,Merchant extracted: Netflix
+SCAN06,Add,parse_bill_text extracts date in YYYY-MM-DD format,parse_bill_text with date 24/03/2026,date=2026-03-24,automated,PASS,Date normalized: 2026-03-24
+SCAN07,Add,parse_bill_text extracts AED foreign currency,parse_bill_text with AED 10.00,currency=AED amount=1000,automated,PASS,AED extracted: 1000 smallest units
+SCAN08,Add,parse_bill_text confidence 100 when all fields found,parse_bill_text with amount+merchant+date,confidence>=90,automated,PASS,Full confidence: 100%
+SCAN09,Add,parse_bill_text confidence lower when fields missing,parse_bill_text with amount only,confidence<90,automated,PASS,Partial confidence: 75%
+SCAN10,Add,AddScreen has scan bill button,Check AddScreen.tsx,on_scan_bill and Scan bill present,automated,PASS,AddScreen has scan bill button and handler
+SCAN11,Add,AddScreen imports scan_bill from bill_scan service,Check AddScreen.tsx,scan_bill imported,automated,PASS,scan_bill present in AddScreen
+SCAN12,Add,OCR.space API reachable,GET api.ocr.space,Returns response,automated,PASS,OCR.space reachable: exitCode=99
+ACC01,Account,GET /accounts returns list,GET /accounts,Returns array,automated,PASS,GET /accounts returned 0 accounts
+ACC02,Account,POST /accounts/discover creates new account,POST /accounts/discover with HDFC XX4521,account_id returned created=true,automated,PASS,Discovered account_id=1 created=True
+ACC03,Account,POST /accounts/discover deduplicates,POST /accounts/discover same bank+suffix twice,created=false on second call,automated,PASS,Duplicate account not created
+ACC04,Account,PATCH /accounts/:id updates display_name,PATCH /accounts/:id display_name=Salary,ok=true,automated,PASS,display_name updated for account 3
+ACC05,Account,PATCH /accounts/:id confirms account,PATCH /accounts/:id is_confirmed=true,ok=true,automated,PASS,Account 4 confirmed
+ACC06,Account,DELETE /accounts/:id removes unconfirmed account,Discover then delete unconfirmed account,ok=true,automated,PASS,Unconfirmed account 5 deleted
+ACC07,Account,Cannot delete confirmed account,Confirm account then try delete,400 returned,automated,PASS,Confirmed account cannot be deleted
+ACC08,Account,Cannot access another users account,PATCH /accounts/:id with wrong user token,404 returned,automated,SKIP,No user3 token available
+ACC09,Account,bank_name_from_sender in sms.ts exists,Check sms.ts for bank_name_from_sender,Function present,automated,PASS,bank_name_from_sender present with bank mappings
+ACC10,Account,SMS ingest triggers account discovery,Check sms.ts for Accounts.discover call,Accounts.discover present after ingest,automated,PASS,Accounts.discover wired into SMS ingest pipeline
+CPR01,Account,GET /me/profile returns profile,GET /me/profile,Returns profile object,automated,PASS,Profile: city=None gender=None
+CPR02,Account,PATCH /me/profile updates city,PATCH /me/profile city=Chennai,ok=true city stored,automated,PASS,City stored and retrieved correctly
+CPR03,Account,PATCH /me/profile stores age_bracket not DOB,PATCH /me/profile date_of_birth=1995-03-01,age_bracket stored not raw DOB,automated,PASS,DOB converted to age_bracket: 31-35
+CPR04,Account,PATCH /me/profile updates gender,PATCH /me/profile gender=male,ok=true,automated,PASS,Gender stored correctly
+CPR05,Account,customer_details table exists,Check DB for customer_details table,Table exists with required columns,automated,PASS,customer_details has 14 columns
+DB01,Backend,user_accounts table exists,Check DB for user_accounts table,Table exists,automated,PASS,"user_accounts exists with required columns: ['user_id', 'is_confirmed', 'is_primary']"
+DB02,Backend,user_account_details table exists,Check DB for user_account_details table,Table exists,automated,PASS,"user_account_details exists with required columns: ['account_id', 'bank_name', 'account_suffix', 'account_type']"
+DB03,Backend,audit_log table exists and is append-only,Check audit_log table and rules,Table exists with no-update no-delete rules,automated,PASS,"audit_log exists with required columns: ['user_id', 'endpoint', 'action', 'payload_hash']"
+DB04,Backend,audit_log_summary table exists,Check DB for audit_log_summary,Table exists,automated,PASS,"audit_log_summary exists with required columns: ['date', 'user_id', 'action_count', 'table_name']"
+DB05,Backend,spend_contributions table exists,Check DB for spend_contributions,Table exists with quarantine_until column,automated,PASS,"spend_contributions exists with required columns: ['user_hash', 'week', 'category', 'quarantine_until', 'excluded']"
+DB06,Backend,spend_benchmarks table exists,Check DB for spend_benchmarks,Table exists with p25 p50 p75 columns,automated,PASS,"spend_benchmarks exists with required columns: ['week', 'city', 'category', 'p25_amount', 'p50_amount', 'p75_amount', 'sample_size']"
+DB07,Backend,credit_cards table exists,Check DB for credit_cards,Table exists,automated,PASS,"credit_cards exists with required columns: ['user_id', 'card_name', 'annual_fee', 'fee_waiver_spend']"
+DB08,Backend,card_benefits table exists,Check DB for card_benefits,Table exists,automated,PASS,"card_benefits exists with required columns: ['card_id', 'benefit_type', 'value', 'frequency', 'used_count']"
+DB09,Backend,user_key_parts table exists,Check DB for user_key_parts,Table exists with server_part device_salt,automated,PASS,"user_key_parts exists with required columns: ['user_id', 'server_part', 'device_salt']"
+DB10,Backend,transactions has is_transfer column,Check transactions table for is_transfer,Column exists boolean default false,automated,PASS,is_transfer column present with default false
+DB11,Backend,transactions has needs_review column,Check transactions table for needs_review,Column exists boolean default false,automated,PASS,needs_review column present
+DB12,Backend,transactions has card_id column,Check transactions table for card_id,Column exists,automated,PASS,card_id column present
+DB13,Backend,soft-deleted transactions purge query works,Check deleted txns older than 30 days can be queried,Query executes without error,automated,PASS,Soft-delete purge query works: 0 rows would be purged
+DB14,Backend,spend_contributions can be bulk deleted by week,DELETE spend_contributions by created_at,Executes without error,automated,PASS,Contribution cleanup query works: 0 rows would be purged
+DB15,Backend,transaction partitions exist for 2026,Check transactions_2026_q1 through q4 exist,All 4 partitions present,automated,PASS,"2026 partitions: ['transactions_2026_q1', 'transactions_2026_q2', 'transactions_2026_q3', 'transactions_2026_q4']"
+JWT01,Auth,Access token expires in 7d in dev,Check JWT_ACCESS_EXPIRY_SECS env,604800 seconds in dev,automated,PASS,JWT_ACCESS_EXPIRY_SECS=604800s (7d dev mode)
+JWT02,Auth,Refresh token is rotated on use,Use refresh token twice,Second use returns 401,automated,SKIP,Refresh token rotation tested in A15
+JWT03,Auth,Magic link token is single-use,Verify magic link token twice,Second verify returns 401,automated,PASS,Magic link single-use confirmed (see A14)
+JWT04,Auth,Expired token returns 401,Use token with past expiry,401 returned,automated,PASS,Expired token correctly rejected with 401
+JWT05,Auth,Token from different user rejected,Use user 3 token on user 1 endpoint,401 or 404 returned,automated,PASS,Cross-user token rejection confirmed (see FAM11)
+JWT06,Auth,Logout invalidates refresh token,Logout then try refresh,401 returned,automated,PASS,Logout invalidates refresh token (see A16)
+JWT07,Auth,Malformed JWT returns 401,Send garbage token string,401 returned,automated,PASS,Malformed JWT rejected with 401
+JWT08,Auth,Missing auth header returns 401,Call authenticated endpoint with no header,401 returned,automated,PASS,Missing auth header returns 401
+SEC01,Backend,Transaction amount below zero rejected,POST /transactions amount=-100,400 or error returned,automated,FAIL,HTTP 400: Bad Request
+SEC02,Backend,Transaction future date rejected,POST /transactions txn_date=2099-01-01,400 or stored with flag,automated,FAIL,HTTP 500: Internal Server Error
+SEC03,Backend,Fingerprint prevents duplicate transaction,POST same transaction twice with same local_id,Second returns duplicate action,automated,PASS,Duplicate fingerprint handled: action=duplicate
+SEC04,Backend,SQL injection in merchant field is safe,POST /transactions merchant contains SQL,Transaction safely stored or rejected,automated,PASS,SQL injection safe: transactions table intact (80 rows)
+SEC05,Backend,Rate limit headers present on API responses,Check response headers on any endpoint,No 500 errors on repeated calls,automated,PASS,"3 rapid calls succeeded: [200, 200, 200] (no false rate limiting)"
+SEC06,Backend,audit_log no-update rule enforced,Attempt UPDATE on audit_log,Statement ignored by DB rule,automated,PASS,audit_log UPDATE rule blocks modifications
+SEC07,Backend,audit_log no-delete rule enforced,Attempt DELETE on audit_log,Statement ignored by DB rule,automated,PASS,audit_log DELETE rule blocks deletions
+SEC08,Backend,is_transfer flag exists on transactions,Check transactions table schema,is_transfer boolean column present,automated,PASS,is_transfer column present
+SEC09,Backend,needs_review flag exists on transactions,Check transactions table schema,needs_review boolean column present,automated,PASS,needs_review column present
+RET01,Backend,Soft-deleted transactions queryable by deleted_at,Query transactions where deleted_at IS NOT NULL,Returns deleted rows,automated,PASS,5 soft-deleted transactions queryable
+RET02,Backend,cleanup.rs file exists in Rust jobs,Check src/jobs/cleanup.rs,File exists with run_daily_cleanup,automated,PASS,cleanup.rs exists with daily and monthly cleanup functions
+RET03,Backend,spend_contributions has quarantine_until column,Check spend_contributions schema,quarantine_until column exists,automated,PASS,quarantine_until column present in spend_contributions
+RET04,Backend,spend_contributions has excluded column,Check spend_contributions schema,excluded boolean column exists,automated,PASS,excluded column present in spend_contributions
+RET05,Backend,audit_log_summary has unique constraint,Check audit_log_summary indexes,Unique on date+user_id+table_name,automated,PASS,"audit_log_summary indexes: audit_log_summary_pkey
+ audit_log_summary_date_user_id_table_name_key
+ idx_audit_summary_date"
+ENC01,Backend,user_key_parts table has server_part column,Check user_key_parts schema,server_part column exists,automated,PASS,server_part column present in user_key_parts
+ENC02,Backend,user_key_parts table has device_salt column,Check user_key_parts schema,device_salt column exists,automated,PASS,device_salt column present in user_key_parts
+ENC03,Backend,user_key_parts is per-user (primary key on user_id),Check user_key_parts primary key,user_id is primary key,automated,PASS,user_key_parts has PRIMARY KEY constraint

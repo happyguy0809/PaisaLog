@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  postgres_main:
+    image: postgres:16
+    container_name: paisalog_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: paisalog
+      POSTGRES_USER: paisalog_api
+      POSTGRES_PASSWORD: "Nil253THIYAxi1yD7scm9A=="
+    ports:
+      - "5432:5432"
+    volumes:
+      - paisalog_db_data:/var/lib/postgresql/data
+
+  postgres_analytics:
+    image: postgres:16
+    container_name: paisalog_analytics_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: paisalog_analytics
+      POSTGRES_USER: paisalog_analytics
+      POSTGRES_PASSWORD: "Nil253THIYAxi1yD7scm9A=="
+    ports:
+      - "5433:5432"
+    volumes:
+      - paisalog_analytics_data:/var/lib/postgresql/data
+
+volumes:
+  paisalog_db_data:
+  paisalog_analytics_data:

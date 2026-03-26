@@ -1,0 +1,64 @@
+{
+  "name": "PaisaLog",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "android":      "react-native run-android",
+    "ios":          "react-native run-ios",
+    "start":        "react-native start",
+    "start:clean":  "react-native start --reset-cache",
+    "build:android": "cd android && ./gradlew assembleRelease",
+    "lint":         "eslint src --ext .ts,.tsx"
+  },
+  "dependencies": {
+    "react":        "18.3.1",
+    "react-native": "0.76.3",
+
+    "// navigation": "React Navigation — explicit, no magic",
+    "@react-navigation/native":       "^7.0.0",
+    "@react-navigation/bottom-tabs":  "^7.0.0",
+    "@react-navigation/stack":        "^7.0.0",
+    "react-native-screens":           "^4.1.0",
+    "react-native-safe-area-context": "^4.12.0",
+    "react-native-gesture-handler":   "^2.20.0",
+
+    "// data": "Server state, local cache",
+    "@tanstack/react-query": "^5.0.0",
+    "zustand":               "^5.0.0",
+
+    "// storage": "Fast, synchronous local storage",
+    "react-native-mmkv":     "^3.1.0",
+    "react-native-keychain": "^9.0.0",
+
+    "// sms": "Android SMS reading — core feature",
+    "react-native-get-sms-android": "^1.1.0",
+
+    "// ui": "Visual components",
+    "@gorhom/bottom-sheet":          "^5.0.0",
+    "react-native-reanimated":       "^3.16.0",
+    "react-native-svg":              "^15.8.0",
+    "react-native-gifted-charts":    "^1.4.0",
+    "react-native-fast-image":       "^8.6.3",
+    "react-native-linear-gradient":  "^2.8.3",
+    "react-native-haptic-feedback":  "^2.3.1",
+
+    "// utils": "Date handling, validation",
+    "dayjs": "^1.11.0",
+    "zod":   "^3.23.0"
+  },
+  "devDependencies": {
+    "@react-native-community/cli":         "latest",
+    "@react-native-community/cli-platform-android": "latest",
+    "@react-native-community/cli-platform-ios":     "latest",
+    "@tsconfig/react-native":              "^3.0.0",
+    "@types/react":                        "^18.3.0",
+    "@types/react-native":                 "^0.73.0",
+    "typescript":                          "^5.3.0",
+    "@typescript-eslint/eslint-plugin":    "^8.0.0",
+    "@typescript-eslint/parser":           "^8.0.0",
+    "eslint":                              "^9.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

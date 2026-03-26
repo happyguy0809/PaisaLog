@@ -1,0 +1,21 @@
+date,area,file,what_was_fixed
+2026-03-22,Auth,App.tsx,handleDeepLink moved inside component - was outside so setIsOnboarded not in scope
+2026-03-22,Auth,App.tsx,setIsOnboarded passed as prop to AppNavigator
+2026-03-22,Auth,src/screens/onboarding/index.tsx,Storage key fixed: onboarding_complete -> onboarding_done
+2026-03-22,Auth,src/screens/onboarding/index.tsx,Storage key fixed: access_token -> tok_access
+2026-03-22,Auth,src/screens/onboarding/index.tsx,setIsOnboarded prop added and wired into done() and deep link listener
+2026-03-22,Navigation,src/navigation/TabNavigator.tsx,Created from scratch - file did not exist
+2026-03-22,Navigation,src/navigation/index.tsx,Colors -> C token reference fixed
+2026-03-22,Navigation,src/navigation/index.tsx,Screen import paths corrected to match actual file locations
+2026-03-22,Navigation,src/navigation/index.tsx,setIsOnboarded prop type added and passed to OnboardingScreen
+2026-03-22,Infra,src/screens/,Deleted bad directory created by failed brace expansion
+2026-03-22,Backend,src/db/queries.rs,Added source column to INSERT - was missing causing NOT NULL violation
+2026-03-22,Backend,schema,ALTER TABLE transactions ALTER COLUMN source SET DEFAULT sms as immediate fix
+2026-03-22,Backend,src/api/*.rs,Stripped all camelCase serde rename_all - full snake_case API convention adopted
+2026-03-22,Frontend,src/services/api.ts,All interfaces + request bodies converted to snake_case
+2026-03-22,Frontend,App.tsx,access_token/refresh_token field names fixed for snake_case auth response
+2026-03-22,Backend,src/api/*.rs,Full camelCase sweep - all JSON response keys converted to snake_case
+2026-03-22,Backend,src/api/transactions.rs,is_cash and is_investment fields added to IngestOneRequest and BatchItem structs
+2026-03-22,Frontend,src/screens/add/AddScreen.tsx,Cash transactions now use Transactions.ingest with is_cash flag instead of separate Cash.create
+2026-03-22,Frontend,src/screens/spend/CategoryScreen.tsx,Fixed undefined txn_date localeCompare crash
+2026-03-22,Frontend,src/screens/add/AddScreen.tsx,Cache invalidation fixed with exact:false

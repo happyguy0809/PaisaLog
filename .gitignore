@@ -1,0 +1,35 @@
+# Rust build artifacts
+**/target/
+
+# Environment secrets
+.env
+*.env
+.env.*
+
+# React Native / Node
+**/node_modules/
+
+# Android build artifacts
+**/android/app/build/
+**/android/.gradle/
+**/android/build/
+
+# iOS build artifacts
+**/ios/build/
+**/ios/Pods/
+**/ios/*.xcworkspace/
+
+# Zip files
+*.zip
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# QA / test artifacts
+qa/__pycache__/
