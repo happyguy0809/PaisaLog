@@ -51,6 +51,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/transactions/:id/restore",    post(transactions::restore))
         .route("/transactions/hidden",       get(transactions::hidden_list))
         .route("/transactions/:id/promote", post(transactions::promote))
+        .route("/transactions/:id/correct", patch(transactions::correct))
 
         // ── Accounts (auto-discovery) ────────────────────────
         .route("/accounts",           get(accounts::list))

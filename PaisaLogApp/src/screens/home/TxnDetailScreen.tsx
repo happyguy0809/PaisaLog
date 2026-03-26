@@ -9,13 +9,14 @@ import { PinchGestureHandler, PanGestureHandler, GestureHandlerRootView, State }
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { HideSheet } from '../../components/HideSheet';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { format_date } from '../../utils/date';
 import { C, F, sp, br, fmt } from '../../design/tokens';
 
 import { T, Row, Between, Divider, Btn, Spacer, Chip } from '../../design/components';
 import { Transactions, Refunds, QK } from '../../services/api';
+import { CATS } from '../spend/categories';
 import { capture_bill, pick_bill, get_photo, save_photo, delete_photo, get_compression_level, bill_photo } from '../../services/photo';
 
 import { getCat } from '../spend/categories';
@@ -107,7 +108,12 @@ export function TxnDetailScreen() {
   const route  = useRoute<any>();
   const qc     = useQueryClient();
   const txnId: number = route.params?.txnId;
-  const [show_hide, setShowHide] = useState(false);
+  const [show_hide,   setShowHide]   = useState(false);
+  const [show_correct, setShowCorrect] = useState(false);
+  const [edit_merchant, setEditMerchant] = useState('');
+  const [edit_category, setEditCategory] = useState('');
+  const [edit_amount,   setEditAmount]   = useState('');
+  const [show_raw_sms,  setShowRawSms]  = useState(false);
   const txnFallback: any = route.params?.txn ?? null;
 
   const [note,    setNote]    = useState('');
@@ -118,7 +124,19 @@ export function TxnDetailScreen() {
 
   // Find txn from any cached query list
   const allCached = qc.getQueriesData<any[]>({ queryKey: ['txns'] });
-  const txn = allCached.flatMap(([, d]) => d ?? []).find((t: any) => t?.id === txnId) ?? txnFallback;
+  const cached = allCached.flatMap(([, d]) => d ?? []).find((t: any) => t?.id === txnId) ?? txnFallback;
+  // If cached row has no metadata (old cache), fetch directly
+  const { data: fetched } = useQuery({
+    queryKey: ['txn_detail', txnId],
+    queryFn:  () => Transactions.list({
+      start: cached?.txn_date ?? new Date().toISOString().split('T')[0],
+      end:   cached?.txn_date ?? new Date().toISOString().split('T')[0],
+      limit: 50,
+    }).then(rows => rows.find((r: any) => r.id === txnId) ?? null),
+    enabled: !!txnId && !cached?.metadata,
+    staleTime: 30_000,
+  });
+  const txn = (cached?.metadata !== undefined ? cached : fetched) ?? cached ?? txnFallback;
 
 
   const deleteMutation = useMutation({
@@ -130,6 +148,19 @@ export function TxnDetailScreen() {
       nav.goBack();
     },
   });
+  const correctMutation = useMutation({
+    mutationFn: () => Transactions.correct(txnId, {
+      merchant: edit_merchant.trim() || undefined,
+      category: edit_category || undefined,
+      amount:   edit_amount ? Math.round(parseFloat(edit_amount) * 100) : undefined,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['txns'], exact: false });
+      qc.invalidateQueries({ queryKey: ['summary'], exact: false });
+      setShowCorrect(false);
+    },
+  });
+
   const hideMut = useMutation({
     mutationFn: (opts: any) => Transactions.set_visibility(txnId, opts),
     onMutate: async (opts: any) => {
@@ -321,7 +352,7 @@ export function TxnDetailScreen() {
           {txn?.metadata && Object.keys(txn.metadata).length > 0 && (
             <View style={{ marginBottom: sp[3], padding: sp[4], backgroundColor: C.n100, borderRadius: br.md }}>
               <T.Cap style={{ letterSpacing: 0.8, marginBottom: sp[2] }}>SOURCE</T.Cap>
-              {txn.metadata.source_type === 'sms' && (
+              {(txn.metadata.source_type === 'sms' || txn.metadata.source_type === 'sms_backfill' || txn.sources === 'sms') && (
                 <>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp[2], marginBottom: sp[2] }}>
                     <View style={{ backgroundColor: C.accentLight, borderRadius: br.sm, paddingHorizontal: sp[2], paddingVertical: 2 }}>
@@ -336,12 +367,24 @@ export function TxnDetailScreen() {
                       {new Date(txn.metadata.sms_timestamp_ms).toLocaleString()}
                     </Text>
                   )}
-                  {!!txn.metadata.raw_source_text && (
-                    <Text style={{ fontFamily: F.regular, fontSize: 12, color: C.textSecondary,
-                      backgroundColor: C.n200, borderRadius: br.sm, padding: sp[2], lineHeight: 18 }}
-                      numberOfLines={4} ellipsizeMode="tail">
-                      {txn.metadata.raw_source_text}
-                    </Text>
+                  {txn.raw_sms_body ? (
+                    <TouchableOpacity onPress={() => setShowRawSms(v => !v)} activeOpacity={0.8}>
+                      <Text style={{ fontFamily: F.regular, fontSize: 12, color: C.textSecondary,
+                        backgroundColor: C.n200, borderRadius: br.sm, padding: sp[2], lineHeight: 18 }}>
+                        {show_raw_sms
+                          ? txn.raw_sms_body
+                          : txn.raw_sms_body.slice(0, 120) + (txn.raw_sms_body.length > 120 ? '\u2026' : '')}
+                      </Text>
+                      {txn.raw_sms_body.length > 120 && (
+                        <T.Cap style={{ color: C.accent, marginTop: sp[1] }}>
+                          {show_raw_sms ? 'Show less \u25b2' : 'Show full message \u25bc'}
+                        </T.Cap>
+                      )}
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={{ backgroundColor: C.n200, borderRadius: br.sm, padding: sp[2] }}>
+                      <T.Cap style={{ color: C.textTertiary }}>No SMS body stored — re-scan to capture.</T.Cap>
+                    </View>
                   )}
                 </>
               )}

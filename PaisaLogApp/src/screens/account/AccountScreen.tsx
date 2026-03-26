@@ -15,7 +15,7 @@ import {
 } from '../../design/components';
 import { User, Tok, Transactions, HouseholdApi, Export, storage, QK } from '../../services/api';
 import { MPIN } from '../../services/mpin';
-import { backfill_sms } from '../../services/sms';
+
 import { fmt_money } from '../../utils/money';
 
 
@@ -322,14 +322,9 @@ export function AccountScreen({ setIsOnboarded }: { setIsOnboarded?: (v: boolean
 
         <TouchableOpacity
           style={[s.signOutBtn, { borderColor: C.accent, marginBottom: sp[2] }]}
-          onPress={async () => {
-            console.log('Starting SMS backfill...');
-            const result = await backfill_sms(50);
-            console.log('Backfill result:', JSON.stringify(result));
-            Alert.alert('SMS Backfill', 'Processed: ' + result.processed + ' Skipped: ' + result.skipped);
-          }}
+          onPress={() => nav.navigate('LinkedAccounts')}
         >
-          <Text style={[s.signOutTxt, { color: C.accent }]}>Sync SMS history</Text>
+          <T.Cap style={{ color: C.accent }}>Import Bank SMS & Emails</T.Cap>
         </TouchableOpacity>
         <T.Cap style={{ textAlign: 'center', marginBottom: sp[4] }}>PaisaLog 0.1.0 · Made in India</T.Cap>
 

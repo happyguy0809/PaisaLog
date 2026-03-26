@@ -94,6 +94,69 @@ function TxnTray({ title, txns, visible, onClose }: any) {
   );
 }
 
+const PAGE_SIZE = 15;
+function RecentTxns({ all_txns }: any) {
+  const nav = useNavigation<any>();
+  const [page, setPage] = useState(1);
+  const sorted = useMemo(() =>
+    [...(all_txns ?? [])].sort((a: any, b: any) =>
+      new Date(b.txn_date).getTime() - new Date(a.txn_date).getTime()
+    ), [all_txns]);
+  const visible = sorted.slice(0, page * PAGE_SIZE);
+  const has_more = visible.length < sorted.length;
+  if (sorted.length === 0) return null;
+  return (
+    <View style={{ marginBottom: sp[2] }}>
+      <T.Cap style={{ marginBottom: sp[2], letterSpacing: 0.5 }}>RECENT TRANSACTIONS</T.Cap>
+      <Card padding={0} style={{ overflow: 'hidden' }}>
+        {visible.map((t: any, i: number) => {
+          const isD   = t.txn_type === 'debit';
+          const isInv = t.is_investment;
+          const col   = isInv ? CAT.investment : isD ? CAT.expense : CAT.income;
+          const sign  = isD ? '−' : '+';
+          const cat   = getCat(t.category, t.merchant);
+          return (
+            <View key={t.id}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => nav.navigate('TransactionDetail', { txnId: t.id, txn: t })}
+                style={{ flexDirection: 'row', alignItems: 'center', padding: sp[3], gap: sp[3] }}
+              >
+                <View style={{ width: 38, height: 38, borderRadius: br.sm, backgroundColor: col + '18', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 16 }}>{cat.icon}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: F.medium, fontSize: 13, color: C.textPrimary }} numberOfLines={1}>
+                    {t.merchant ?? (isD ? 'Payment' : 'Received')}
+                  </Text>
+                  <Text style={{ fontFamily: F.regular, fontSize: 11, color: C.textTertiary }}>
+                    {cat.label}  ·  {format_date(t.txn_date, 'D MMM')}
+                  </Text>
+                </View>
+                <Text style={{ fontFamily: F.semibold, fontSize: 14, color: col }}>
+                  {sign}{fmt_money(t.amount, 'INR', { compact: true })}
+                </Text>
+                <Text style={{ color: C.textTertiary, fontSize: 14 }}>›</Text>
+              </TouchableOpacity>
+              {i < visible.length - 1 && <Divider ml={sp[3] + 38 + sp[3]} />}
+            </View>
+          );
+        })}
+        {has_more && (
+          <TouchableOpacity
+            onPress={() => setPage(p => p + 1)}
+            style={{ padding: sp[4], alignItems: 'center', borderTopWidth: 0.5, borderTopColor: C.borderFaint }}
+          >
+            <Text style={{ fontFamily: F.medium, fontSize: 13, color: C.accent }}>
+              Show more  ({sorted.length - visible.length} remaining)
+            </Text>
+          </TouchableOpacity>
+        )}
+      </Card>
+    </View>
+  );
+}
+
 function OverallTab({ summary, all_txns, targets, onTabSwitch }: any) {
   const qc = useQueryClient();
   const [show_t, setShowT] = useState(false);
@@ -124,8 +187,11 @@ function OverallTab({ summary, all_txns, targets, onTabSwitch }: any) {
   ];
   const by_cat = useMemo(() => {
     const m: Record<string, { total: number; txns: any[] }> = {};
-    (all_txns ?? []).filter((t: any) => t.txn_type === 'debit' && !t.is_investment).forEach((t: any) => {
-      const k = t.category ?? 'Uncategorised';
+    (all_txns ?? []).forEach((t: any) => {
+      // Derive category key — investments get 'investment', credits get their category/income
+      const k = t.is_investment ? 'investment'
+              : t.txn_type === 'credit' ? (t.category ?? 'income')
+              : (t.category ?? 'Uncategorised');
       if (!m[k]) m[k] = { total: 0, txns: [] };
       m[k].total += t.amount;
       m[k].txns.push(t);
@@ -136,7 +202,7 @@ function OverallTab({ summary, all_txns, targets, onTabSwitch }: any) {
         if (b[0] === 'Uncategorised') return -1;
         return b[1].total - a[1].total;
       })
-      .slice(0, 6);
+      .slice(0, 8);
   }, [all_txns]);
   const exp_total = by_cat.reduce((s, [, v]) => s + v.total, 0);
   return (
@@ -167,24 +233,35 @@ function OverallTab({ summary, all_txns, targets, onTabSwitch }: any) {
       )}
       {by_cat.length > 0 && (
         <>
-          <T.Cap style={s.secHdr}>TOP EXPENSE CATEGORIES</T.Cap>
+          <T.Cap style={s.secHdr}>ALL CATEGORIES</T.Cap>
           <Card padding={sp[3]} style={{ marginBottom: sp[4] }}>
-            {by_cat.map(([name, data], i) => (
-              <TouchableOpacity key={name} onPress={() => setTray({ title: name, txns: data.txns })} activeOpacity={0.7}>
-                <Between style={{ paddingVertical: sp[2] }}>
-                  <T.Small style={{ fontFamily: F.medium }}>{getCat(name, null).label}</T.Small>
-                  <Row style={{ gap: sp[3] }}>
-                    <T.Cap>{exp_total > 0 ? Math.round(data.total / exp_total * 100) : 0}%</T.Cap>
-                    <Text style={{ fontFamily: F.semibold, fontSize: 13, color: CAT.expense }}>{fmt_money(data.total, 'INR', { compact: true })}</Text>
-                  </Row>
-                </Between>
-                <Bar segments={[{ value: data.total, color: CAT.expense }]} total={exp_total} height={4} />
-                {i < by_cat.length - 1 && <Spacer h={sp[1]} />}
-              </TouchableOpacity>
-            ))}
+            {by_cat.map(([name, data], i) => {
+              const catInfo = getCat(name, null);
+              const rowColor = name === 'investment' ? CAT.investment
+                             : name === 'income'     ? CAT.income
+                             : name === 'Uncategorised' ? C.textTertiary
+                             : CAT.expense;
+              return (
+                <TouchableOpacity key={name} onPress={() => setTray({ title: catInfo.label, txns: data.txns })} activeOpacity={0.7}>
+                  <Between style={{ paddingVertical: sp[2] }}>
+                    <Row style={{ gap: sp[2], flex: 1 }}>
+                      <Text style={{ fontSize: 16 }}>{catInfo.icon}</Text>
+                      <T.Small style={{ fontFamily: F.medium }}>{catInfo.label}</T.Small>
+                    </Row>
+                    <Row style={{ gap: sp[3] }}>
+                      <T.Cap>{data.txns.length} txn{data.txns.length !== 1 ? 's' : ''}</T.Cap>
+                      <Text style={{ fontFamily: F.semibold, fontSize: 13, color: rowColor }}>{fmt_money(data.total, 'INR', { compact: true })}</Text>
+                    </Row>
+                  </Between>
+                  <Bar segments={[{ value: data.total, color: rowColor }]} total={exp_total} height={4} />
+                  {i < by_cat.length - 1 && <Spacer h={sp[1]} />}
+                </TouchableOpacity>
+              );
+            })}
           </Card>
         </>
       )}
+      <RecentTxns all_txns={all_txns} />
       <Spacer h={sp[16]} />
       <TxnTray title={tray?.title ?? ''} txns={tray?.txns} visible={!!tray} onClose={() => setTray(null)} />
     </ScrollView>

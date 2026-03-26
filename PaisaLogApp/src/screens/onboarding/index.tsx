@@ -7,10 +7,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { C, F, sp, br } from '../../design/tokens';
 import { Btn, T, Spacer } from '../../design/components';
-import { Auth, storage } from '../../services/api';
+import { Auth, storage, EmailAccounts, LinkedEmailAccount } from '../../services/api';
 import { request_sms_permission } from '../../services/sms';
 
-type Step = 'sms' | 'email' | 'sent' | 'backup';
+type Step = 'sms' | 'bank_email' | 'email' | 'sent' | 'backup';
 
 export function OnboardingScreen({
   navigation,
@@ -23,6 +23,8 @@ export function OnboardingScreen({
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [linkedEmails, setLinkedEmails] = useState<LinkedEmailAccount[]>(() => EmailAccounts.list());
+  const [newEmail, setNewEmail] = useState('');
 
   // Deep link listener — fires when magic link is tapped while on sent screen
   useEffect(() => {
@@ -88,14 +90,78 @@ export function OnboardingScreen({
             label="Allow SMS access"
             onPress={async () => {
               await request_sms_permission();
-              setStep("email");
+              setStep("bank_email");
             }}
             variant="primary"
             size="lg"
             fullWidth
           />
-          <TouchableOpacity style={s.skipBtn} onPress={() => setStep("email")}>
+          <TouchableOpacity style={s.skipBtn} onPress={() => setStep("bank_email")}>
             <T.Cap>Skip for now</T.Cap>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  if (step === 'bank_email') {
+    function handleAdd() {
+      const t = newEmail.trim().toLowerCase();
+      if (!t.includes('@') || !t.includes('.')) return;
+      try {
+        const provider: LinkedEmailAccount['provider'] =
+          t.endsWith('@gmail.com') ? 'gmail' :
+          (t.endsWith('@outlook.com') || t.endsWith('@hotmail.com')) ? 'outlook' : 'other';
+        EmailAccounts.add({ email: t, provider });
+        setLinkedEmails(EmailAccounts.list());
+        setNewEmail('');
+      } catch {}
+    }
+    return (
+      <SafeAreaView style={s.safe}>
+        <StatusBar barStyle="dark-content" backgroundColor={C.pageBg} />
+        <ScrollView contentContainerStyle={s.page} showsVerticalScrollIndicator={false}>
+          <View style={s.logoRow}><View style={s.logoDot} /><Text style={s.logoTxt}>PaisaLog</Text></View>
+          <Spacer h={sp[8]} />
+          <Text style={s.headLine}>{'Connect\nbank emails.'}</Text>
+          <T.Body style={{ marginTop: sp[3], lineHeight: 22 }}>
+            Add the Gmail or Outlook address linked to your bank.
+          </T.Body>
+          <Spacer h={sp[5]} />
+          {linkedEmails.map(acc => (
+            <View key={acc.id} style={be.pill}>
+              <Text style={be.pillIcon}>{acc.provider === 'gmail' ? '📧' : acc.provider === 'outlook' ? '📨' : '✉️'}</Text>
+              <Text style={be.pillEmail}>{acc.email}</Text>
+              <TouchableOpacity onPress={() => { EmailAccounts.remove(acc.id); setLinkedEmails(EmailAccounts.list()); }}>
+                <Text style={be.pillX}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+          <View style={be.inputRow}>
+            <TextInput
+              style={be.input} value={newEmail} onChangeText={setNewEmail}
+              placeholder="you@gmail.com" placeholderTextColor={C.textDisabled}
+              keyboardType="email-address" autoCapitalize="none"
+              returnKeyType="done" onSubmitEditing={handleAdd}
+            />
+            <TouchableOpacity style={[be.addBtn, !newEmail.includes('@') && be.addBtnOff]}
+              onPress={handleAdd} disabled={!newEmail.includes('@')}>
+              <Text style={be.addBtnTxt}>Add</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={s.privacyRow}>
+            <Text style={s.lock}>🔒</Text>
+            <T.Cap style={s.privacyTxt}>Only transaction emails are read. No credentials stored.</T.Cap>
+          </View>
+          <Spacer h={sp[6]} />
+          <Btn
+            label={linkedEmails.length > 0 ? 'Continue' : 'Continue without email'}
+            onPress={() => setStep('email')}
+            variant={linkedEmails.length > 0 ? 'primary' : 'secondary'}
+            size="lg" fullWidth
+          />
+          <TouchableOpacity style={s.skipBtn} onPress={() => setStep('email')}>
+            <T.Cap>Skip — I'll add later</T.Cap>
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
@@ -254,4 +320,15 @@ const s = StyleSheet.create({
   recBadge:   { backgroundColor: C.investBg, paddingHorizontal: sp[2], paddingVertical: 3, borderRadius: br.full },
   recBadgeTxt:{ fontFamily: F.medium, fontSize: 10, color: C.investText },
   skipOutlined: { borderWidth: 0.5, borderColor: C.borderDefault, borderRadius: br.sm, padding: sp[4] },
+});
+const be = StyleSheet.create({
+  pill:      { flexDirection: 'row', alignItems: 'center', backgroundColor: C.cardBg, borderRadius: br.sm, borderWidth: 0.5, borderColor: C.borderFaint, padding: sp[3], marginBottom: sp[2], gap: sp[2] },
+  pillIcon:  { fontSize: 16 },
+  pillEmail: { flex: 1, fontFamily: F.regular, fontSize: 13, color: C.textPrimary },
+  pillX:     { fontFamily: F.regular, fontSize: 14, color: C.textTertiary, paddingHorizontal: sp[1] },
+  inputRow:  { flexDirection: 'row', gap: sp[2], marginBottom: sp[4] },
+  input:     { flex: 1, backgroundColor: C.inputBg, borderRadius: br.sm, borderWidth: 1, borderColor: C.borderDefault, paddingHorizontal: sp[3], paddingVertical: sp[3], fontFamily: F.regular, fontSize: 15, color: C.textPrimary },
+  addBtn:    { backgroundColor: C.accent, borderRadius: br.sm, paddingHorizontal: sp[4], justifyContent: 'center' },
+  addBtnOff: { backgroundColor: C.n300 },
+  addBtnTxt: { fontFamily: F.semibold, fontSize: 14, color: '#fff' },
 });

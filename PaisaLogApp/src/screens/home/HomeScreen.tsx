@@ -27,7 +27,7 @@ import {
   Between, Row, MetricCard, Card, Caption, Body, Small,
   Heading, SectionLabel, Divider, Bone, Chip, ProgressBar,
 } from '../../design/components';
-import { Transactions, Investments, QK } from '../../services/api';
+import { Transactions, Investments, QK, storage } from '../../services/api';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import { fmt_money } from '../../utils/money';
 
@@ -115,6 +115,7 @@ export function HomeScreen() {
       <StatusBar barStyle="dark-content" backgroundColor={Colors.bg.page} />
 
       <BudgetAlertBanner start={range.start} end={range.end} />
+      <SmsScanBanner />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}

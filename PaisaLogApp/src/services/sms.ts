@@ -4,9 +4,11 @@
 // OTPs are never forwarded — filtered at the Java layer and again here.
 
 import { NativeModules, NativeEventEmitter, PermissionsAndroid, Platform } from 'react-native';
-import { Transactions } from './api';
+import { Transactions, storage } from './api';
 
 const { SmsModule } = NativeModules;
+// DEBUG — log what native modules are available
+// DEBUG removed
 const sms_emitter = SmsModule ? new NativeEventEmitter(SmsModule) : null;
 
 // ── Permission request ────────────────────────────────────────
@@ -297,26 +299,118 @@ export function stop_sms_listener(): void {
   listener_active = false;
 }
 
+// ── Financial sender pre-filter ──────────────────────────────
+const FIN_FRAGMENTS = [
+  'BANK','HDFC','ICICI','SBI','AXIS','KOTAK','INDUS','YESB','PNB',
+  'BOI','CANARA','UNION','IDFC','PAYTM','AMEX','CITI','STANC',
+  'CARD','UPI','NEFT','IMPS','CREDIT','DEBIT','WALLET','RUPAY',
+];
+export function is_financial_sender(sender: string): boolean {
+  const raw      = sender.toUpperCase();
+  const stripped = raw.replace(/^[A-Z]{2}-/, '');
+  return FIN_FRAGMENTS.some(f => raw.includes(f) || stripped.includes(f));
+}
+
 // ── Historical backfill ───────────────────────────────────────
-// Reads last N SMS from inbox and ingests any financial ones not yet recorded.
-export async function backfill_sms(max_count = 100): Promise<{ processed: number; skipped: number }> {
-  if (!SmsModule) return { processed: 0, skipped: 0 };
-  let processed = 0;
-  let skipped = 0;
+const SIX_MONTHS_MS  = 6 * 30 * 24 * 60 * 60 * 1000;
+const BACKFILL_BATCH = 50;
 
+export interface ScanProgress {
+  status:   'reading' | 'filtering' | 'parsing' | 'submitting' | 'done' | 'error';
+  total:    number;
+  filtered: number;
+  parsed:   number;
+  submitted:number;
+  created:  number;
+  skipped:  number;
+  error?:   string;
+}
+export type ProgressCb = (p: ScanProgress) => void;
+
+export async function backfill_sms(opts: {
+  from_ms?:     number;
+  to_ms?:       number;
+  on_progress?: ProgressCb;
+  max_sms?:     number;
+} = {}): Promise<{ processed: number; skipped: number; created: number }> {
+  if (!SmsModule) return { processed: 0, skipped: 0, created: 0 };
+  const { from_ms = Date.now() - SIX_MONTHS_MS, to_ms = Date.now(),
+          on_progress, max_sms = 10_000 } = opts;
+  let prog: ScanProgress = {
+    status: 'reading', total: 0, filtered: 0,
+    parsed: 0, submitted: 0, created: 0, skipped: 0,
+  };
+  const emit = (patch: Partial<ScanProgress>) => {
+    prog = { ...prog, ...patch }; on_progress?.(prog);
+  };
+  let all: Array<{ sender: string; body: string; timestamp: number }> = [];
   try {
-    const messages: Array<{ sender: string; body: string; timestamp: number }> =
-      await SmsModule.getRecentSms(max_count);
-
-    for (const msg of messages) {
-      const ok = await process_sms_event(msg.sender, msg.body, msg.timestamp);
-      if (ok) processed++; else skipped++;
-      // Small delay to avoid hammering the backend
-      await new Promise(r => setTimeout(r, 100));
-    }
+    all = await SmsModule.getRecentSms(max_sms);
   } catch (e) {
-    console.error('SMS backfill error:', e);
+    emit({ status: 'error', error: String(e) });
+    return { processed: 0, skipped: 0, created: 0 };
   }
-
-  return { processed, skipped };
+  emit({ status: 'filtering', total: all.length });
+  const financial = all.filter(
+    m => m.timestamp >= from_ms && m.timestamp <= to_ms
+      && is_financial_sender(m.sender ?? '')
+  );
+  emit({ status: 'parsing', filtered: financial.length });
+  let tz_off = '+05:30';
+  try {
+    const tz = storage.getString('user_timezone');
+    if (tz) { const { get_tz_offset } = require('../utils/date'); tz_off = get_tz_offset(tz); }
+  } catch {}
+  const to_submit: any[] = [];
+  for (const msg of financial) {
+    const parsed = parse_sms(msg.sender ?? '', msg.body ?? '');
+    if (!parsed) { emit({ skipped: prog.skipped + 1 }); continue; }
+    to_submit.push({
+      local_id:          `sms_${msg.timestamp}_${parsed.amount}`,
+      amount:            parsed.amount,
+      txn_type:          parsed.txn_type,
+      merchant:          parsed.merchant   ?? undefined,
+      acct_suffix:       parsed.acct_suffix ?? undefined,
+      confidence:        75,
+      source:            'sms',
+      txn_date:          new Date(msg.timestamp).toISOString().split('T')[0],
+      epoch_seconds:     Math.floor(msg.timestamp / 1000),
+      tz_offset:         tz_off,
+      is_cash:           /atm|cash/i.test(msg.body ?? ''),
+      original_amount:   parsed.original_amount   ?? undefined,
+      original_currency: parsed.original_currency ?? undefined,
+      metadata: {
+        sender_id:       parsed.sender,
+        parse_version:   '2.0',
+        source_type:      'sms_backfill',
+        sms_timestamp_ms: msg.timestamp,
+      },
+      raw_sms_body: msg.body ?? '',
+    });
+    emit({ parsed: prog.parsed + 1 });
+  }
+  emit({ status: 'submitting' });
+  let created = 0;
+  for (let i = 0; i < to_submit.length; i += BACKFILL_BATCH) {
+    const chunk = to_submit.slice(i, i + BACKFILL_BATCH);
+    try {
+      // Log first item fingerprint inputs to diagnose collisions
+      if (chunk[0]) {
+        const s = chunk[0];
+        console.log('[BATCH_DEBUG] sample:', s.amount, s.acct_suffix, s.epoch_seconds, s.txn_date, s.local_id);
+      }
+      const nullSuffix = chunk.filter((x: any) => !x.acct_suffix).length;
+      console.log('[BATCH] sending', chunk.length, '| null acct_suffix:', nullSuffix);
+      const r = await Transactions.batch({ transactions: chunk });
+      console.log('[BATCH] response:', JSON.stringify(r));
+      created += r.created ?? 0;
+      emit({ submitted: prog.submitted + chunk.length, created: prog.created + (r.created ?? 0) });
+    } catch (e: any) { console.warn('[BATCH] chunk failed:', e?.status, e?.message, e?.code); }
+    await new Promise(r => setTimeout(r, 150));
+  }
+  storage.set('sms_backfill_done',    'true');
+  storage.set('sms_backfill_ts',      String(Date.now()));
+  storage.set('sms_backfill_created', String(created));
+  emit({ status: 'done', created });
+  return { processed: to_submit.length, skipped: prog.skipped, created };
 }

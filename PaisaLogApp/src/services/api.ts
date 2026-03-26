@@ -152,8 +152,26 @@ export const Transactions = {
     fx_rate_at_entry?: number;
     metadata?: Record<string, any>;
   }) => call<{ action: string; txn_id?: number }>('/transactions', { method: 'POST', body: JSON.stringify(d) }),
+  batch: (d: { transactions: Array<{
+    local_id?: string; amount: number; txn_type: string;
+    merchant?: string; acct_suffix?: string; confidence: number;
+    source: string; txn_date: string; epoch_seconds: number;
+    is_investment?: boolean; is_cash?: boolean; tz_offset?: string;
+    original_amount?: number; original_currency?: string;
+    fx_rate_at_entry?: number; metadata?: Record<string, any>;
+    raw_sms_body?: string; raw_email_body?: string;
+  }> }) =>
+    call<{ created: number; merged: number; skipped: number; errors: string[] }>(
+      '/transactions/batch', { method: 'POST', body: JSON.stringify(d) }
+    ),
   delete:  (id: number) =>
     call<{ ok: boolean; id: number }>(`/transactions/${id}`, { method: 'DELETE' }),
+  correct: (id: number, body: {
+    merchant?: string; category?: string;
+    amount?: number; txn_type?: string; note?: string;
+  }) => call<{ ok: boolean }>(`/transactions/${id}/correct`, {
+    method: 'PATCH', body: JSON.stringify(body)
+  }),
   note:    (id: number, note: string) =>
     call<{ ok: boolean }>(`/transactions/${id}/note`, { method: 'PATCH', body: JSON.stringify({ note }) }),
   rawLog:  (limit = 20) => call<any[]>(`/transactions/raw-log?limit=${limit}`),
@@ -260,6 +278,34 @@ export const HouseholdApi = {
     call<Array<{ id: number; name: string; role: string; joined_at: string; member_count: number }>>('/households'),
   transactions: (id: number, start: string, end: string, limit = 500) =>
     call<any[]>(`/household/${id}/transactions?start=${start}&end=${end}&limit=${limit}`),
+};
+
+export interface LinkedEmailAccount {
+  id: string; email: string;
+  provider: 'gmail' | 'outlook' | 'other';
+  label?: string; added_at: number;
+  last_parsed?: number; txns_found?: number;
+}
+export const EmailAccounts = {
+  list(): LinkedEmailAccount[] {
+    try { const r = storage.getString('linked_email_accounts'); return r ? JSON.parse(r) : []; }
+    catch { return []; }
+  },
+  add(a: Omit<LinkedEmailAccount,'id'|'added_at'>): LinkedEmailAccount {
+    const all = EmailAccounts.list();
+    if (all.find(x => x.email === a.email)) throw new Error('Already linked');
+    const entry = { ...a, id: `ea_${Date.now()}`, added_at: Date.now() };
+    storage.set('linked_email_accounts', JSON.stringify([...all, entry]));
+    return entry;
+  },
+  remove(id: string) {
+    storage.set('linked_email_accounts',
+      JSON.stringify(EmailAccounts.list().filter(a => a.id !== id)));
+  },
+  update(id: string, patch: Partial<LinkedEmailAccount>) {
+    storage.set('linked_email_accounts',
+      JSON.stringify(EmailAccounts.list().map(a => a.id === id ? {...a,...patch} : a)));
+  },
 };
 
 // ─── React Query keys ────────────────────────────────────────────

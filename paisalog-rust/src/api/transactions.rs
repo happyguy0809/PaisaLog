@@ -117,6 +117,8 @@ pub async fn ingest_one(
         fx_rate_at_entry:  body.fx_rate_at_entry,
         metadata:          body.metadata.clone().unwrap_or(serde_json::json!({})),
         local_id:       input.local_id,
+        raw_sms_body:   None,
+        raw_email_body: None,
     };
 
     match queries::insert_transaction(&state.pool, &insert).await? {
@@ -160,6 +162,8 @@ pub struct BatchItem {
     pub original_currency:  Option<String>,
     pub fx_rate_at_entry:   Option<f64>,
     pub metadata:           Option<serde_json::Value>,
+    pub raw_sms_body:   Option<String>,
+    pub raw_email_body: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -198,13 +202,34 @@ pub async fn ingest_batch(
             item.epoch_seconds,
         );
 
+        let category = item.merchant.as_deref()
+            .map(crate::parser::category::normalise_merchant)
+            .as_deref()
+            .and_then(crate::parser::category::assign_category)
+            .map(|s| s.to_string())
+            .or_else(|| item.merchant.as_deref().and_then(|m| {
+                // Raw bank strings — keyword fallback
+                let ml = m.to_lowercase();
+                if ml.contains("swiggy") || ml.contains("zomato") || ml.contains("zepto") || ml.contains("bigbasket") || ml.contains("blinkit") { return Some("food".to_string()); }
+                if ml.contains("flipkart") || ml.contains("amazon") || ml.contains("meesho") || ml.contains("myntra") || ml.contains("nykaa") { return Some("shopping".to_string()); }
+                if ml.contains("uber") || ml.contains("ola") || ml.contains("rapido") || ml.contains("irctc") || ml.contains("redbus") { return Some("transport".to_string()); }
+                if ml.contains("airtel") || ml.contains("jio") || ml.contains("bsnl") || ml.contains("vodafone") || ml.contains("electricity") || ml.contains("bescom") || ml.contains("tneb") { return Some("bills".to_string()); }
+                if ml.contains("netflix") || ml.contains("spotify") || ml.contains("hotstar") || ml.contains("prime") || ml.contains("youtube") { return Some("entertainment".to_string()); }
+                if ml.contains("apollo") || ml.contains("pharmeasy") || ml.contains("1mg") || ml.contains("netmeds") || ml.contains("hospital") { return Some("health".to_string()); }
+                if ml.contains("zerodha") || ml.contains("groww") || ml.contains("upstox") || ml.contains("mf") || ml.contains("mutual") || ml.contains("sip") { return Some("investment".to_string()); }
+                if ml.contains("salary") || ml.contains("payroll") || ml.contains("neft cr") { return Some("income".to_string()); }
+                if ml.contains("zpto") || ml.contains("zepto") { return Some("groceries".to_string()); }
+                None
+            }));
+        let merchant_normalised = item.merchant.as_deref()
+            .map(crate::parser::category::normalise_merchant);
         let insert = queries::InsertTransaction {
             user_id:        auth.user_id,
             household_id:   None,
             amount:   item.amount as i32,
             txn_type:       item.txn_type.clone(),
-            merchant:       item.merchant.clone(),
-            category:       None,
+            merchant:       merchant_normalised.or(item.merchant.clone()),
+            category,
             confidence:     item.confidence as i32,
             verified:       false,
             sources:        item.source.clone(),
@@ -220,6 +245,8 @@ pub async fn ingest_batch(
             is_subscription:false,
             is_cash:        item.is_cash.unwrap_or(false),
             local_id:       item.local_id.clone(),
+            raw_sms_body:   item.raw_sms_body.clone(),
+            raw_email_body: item.raw_email_body.clone(),
         };
 
         match queries::insert_transaction(&state.pool, &insert).await {
@@ -429,6 +456,8 @@ pub async fn promote(
         is_subscription:false,
         is_cash:        false,
         local_id:       None,
+        raw_sms_body:   None,
+        raw_email_body: None,
     };
 
     let txn_id = queries::insert_transaction(&state.pool, &insert).await?;
@@ -439,6 +468,57 @@ pub async fn promote(
     ).execute(&state.pool).await?;
 
     Ok(Json(serde_json::json!({ "ok": true, "txn_id": txn_id })))
+}
+
+// ── Correct transaction (manual merchant/category/amount fix) ────
+#[derive(Debug, serde::Deserialize)]
+pub struct CorrectBody {
+    pub merchant:  Option<String>,
+    pub category:  Option<String>,
+    pub amount:    Option<i32>,
+    pub txn_type:  Option<String>,
+    pub note:      Option<String>,
+}
+
+pub async fn correct(
+    State(state): State<AppState>,
+    Path(id):     Path<i64>,
+    auth:         AuthUser,
+    Json(body):   Json<CorrectBody>,
+) -> AppResult<Json<serde_json::Value>> {
+    // Validate txn_type if provided
+    if let Some(ref t) = body.txn_type {
+        if !["debit","credit","refund"].contains(&t.as_str()) {
+            return Err(AppError::Validation("txn_type must be debit, credit, or refund".into()));
+        }
+    }
+    if let Some(a) = body.amount {
+        if a <= 0 { return Err(AppError::Validation("amount must be positive".into())); }
+    }
+    let result = sqlx::query!(
+        r#"UPDATE transactions SET
+            merchant  = COALESCE($3, merchant),
+            category  = COALESCE($4, category),
+            amount    = COALESCE($5, amount),
+            txn_type  = COALESCE($6, txn_type),
+            note      = COALESCE($7, note),
+            verified  = true,
+            metadata  = metadata || jsonb_build_object('manually_corrected', true, 'corrected_at', NOW()::text)
+        WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+        RETURNING id"#,
+        id, auth.user_id,
+        body.merchant,
+        body.category,
+        body.amount,
+        body.txn_type,
+        body.note,
+    )
+    .fetch_optional(&state.pool)
+    .await?;
+    match result {
+        Some(_) => Ok(Json(serde_json::json!({ "ok": true, "id": id }))),
+        None    => Err(AppError::NotFound),
+    }
 }
 
 // ── Delete transaction ────────────────────────────────────────
@@ -563,7 +643,7 @@ pub async fn deleted_list(
             local_id, created_at,
             is_hidden, hidden_from_family, hidden_until, exclude_from_totals,
             tz_offset, original_amount, original_currency, fx_rate_at_entry,
-            metadata
+            metadata, raw_sms_body, raw_email_body
         FROM transactions
         WHERE user_id = $1
           AND deleted_at IS NOT NULL

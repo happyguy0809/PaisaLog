@@ -1,6 +1,6 @@
 # PaisaLog — Core Project Beliefs & Feature Tracker
 # This file is the source of truth for how we build.
-# Last updated: 2026-03-22
+# Last updated: 2026-03-26
 
 ## Core Beliefs
 
@@ -739,3 +739,121 @@ Storage cost scales with paid users only — free users cost us near zero.
     audit_log:          ~300 bytes × all_users × 5 writes/day × 90 days
     spend_contributions: ~200 bytes × all_users × 8 categories × 7 days max
     spend_benchmarks:   ~100 bytes × cities × cohorts × 104 weeks
+
+---
+## Belief 22 — Manual transaction correction is always available
+
+Users must always be able to correct what the parser got wrong. No automated system is perfect.
+
+- Every transaction has a ✏️ "Correct this transaction" UI in TxnDetailScreen
+- Correctable fields: merchant name, category, amount, txn_type
+- On correction: `verified = true` set in DB, `manually_corrected: true` added to metadata
+- Corrected transactions show an "Edited" badge in the detail screen
+- Manual corrections are never overwritten by re-scans or background jobs
+- Category correction goes through the same `CATS` key list (Belief 13) — no free-form category strings
+- Amount correction stored in paise (Belief 8) — UI accepts rupees, converts before sending
+- API: `PATCH /transactions/:id/correct` — partial update, only provided fields are changed
+- Correction data feeds the ML categorization training pipeline (Belief 23)
+
+---
+## Belief 23 — SMS/Email parsing is a pipeline, not a one-time event
+
+Parsing quality improves over time. The system is designed for iteration, not perfection at launch.
+
+### Current pipeline (MVP)
+1. Java layer: read SMS inbox, filter OTPs, return raw messages
+2. JS layer (`sms.ts`): `is_financial_sender()` pre-filter, `parse_sms()` extraction
+3. Rust batch handler: `normalise_merchant()` + keyword category fallback
+4. DB: stores parsed fields + full raw SMS in `metadata.raw_source_text`
+5. User: can correct any field via TxnDetailScreen (Belief 22)
+
+### Parser improvement path
+- Every manual correction = one labelled training example
+- At ~500 corrections: fine-tune a MobileBERT/DistilBERT text classifier on-device (< 30MB)
+- Input: `(raw_merchant_string, sms_body_snippet)` → Output: `category`
+- Inference: on-device via TensorFlow Lite or ONNX Runtime React Native
+- Near-term fallback: Claude API nightly job on `WHERE category IS NULL` rows
+
+### Raw SMS transparency
+- `metadata.raw_source_text`: first 300 chars of original SMS body (stored at parse time)
+- `metadata.sender_id`: bank sender ID (e.g. `AD-SBICRD-S`)
+- `metadata.sms_timestamp_ms`: epoch ms of original SMS
+- `metadata.parse_version`: version string of parser that created this record
+- Always visible to user in TxnDetailScreen → "📨 Raw SMS log" expandable section
+- This is non-negotiable per Belief 12
+
+### Financial sender detection
+- `is_financial_sender(sender)` in `sms.ts` pre-filters before parse attempts
+- Checks both raw sender and stripped (removes `VM-`, `AX-` etc. operator prefixes)
+- Fragment list: BANK, HDFC, ICICI, SBI, AXIS, KOTAK, INDUS, YESB, PNB, BOI, CANARA,
+  UNION, IDFC, PAYTM, AMEX, CITI, STANC, CARD, UPI, NEFT, IMPS, CREDIT, DEBIT, WALLET, RUPAY
+- Unknown senders still pass if body contains Rs/INR/₹ — financial content overrides sender check
+
+### Known parser limitations (as of 2026-03-26)
+- Raw bank strings like `ZEPTOMARKETPLACEPRIVATE`, `BHARTIAIRTELLTD` not normalised before storage
+- Merchant normalisation happens in Rust batch handler but not in JS `parse_sms()`
+- Solution: `getCat(category, merchant)` on frontend uses regex match fallback — display is correct
+  even when DB merchant is raw string
+- Proper fix: run `normalise_merchant()` in JS before batch submit (planned)
+
+---
+## Belief 24 — SMS historical backfill is user-controlled, not automatic
+
+The app never silently ingests data without user knowledge.
+
+### Backfill design
+- `backfill_sms(opts)` in `sms.ts` accepts: `from_ms`, `to_ms`, `on_progress`, `max_sms`
+- Default range: last 6 months (configurable by user in LinkedAccountsScreen)
+- User picks scan period: 1 Month / 3 Months / 6 Months / 1 Year
+- Live progress reported via `ScanProgress` callback:
+  `reading → filtering → parsing → submitting → done`
+- Progress shown as animated bar with step label and stats (parsed / new / skipped)
+- Dedup: `local_id = sms_{timestamp}_{amount}` — safe to re-scan, duplicates skipped server-side
+- Permission wall: if READ_SMS not granted, shows 🔒 "Grant SMS Access" before scan buttons appear
+
+### Batch submit
+- Parsed SMS sent to `POST /transactions/batch` in chunks of 50
+- Backend deduplicates via fingerprint `hash(user_id | amount | acct_suffix | time_bucket_120s)`
+- Response: `{ created, merged, skipped, errors }` — all counted in progress UI
+- 150ms delay between chunks — avoids flooding backend
+
+### Email accounts
+- User can add Gmail/Outlook addresses in LinkedAccountsScreen
+- Stored locally in MMKV via `EmailAccounts` store
+- Gmail OAuth integration is Phase 1 — accounts registered now, scanning enabled on activation
+- No credentials stored — OAuth token flow handled at activation time
+
+### Entry points
+- Home screen: "Import Bank SMS & Emails" banner (dismissible, reappears after new scan)
+- Account screen: "Import Bank SMS & Emails" button
+- LinkedAccountsScreen: full scan UI with date picker and email management
+
+---
+## Feature Status Update — 2026-03-26
+
+### ✅ DONE (added this session)
+| Feature | Notes |
+|---------|-------|
+| SMS historical backfill with date range | User picks 1M/3M/6M/1Y, live progress bar, batch submit |
+| `is_financial_sender()` pre-filter | Strips operator prefixes, checks 25 bank fragments |
+| Java SMS LIMIT bug fix | Removed LIMIT from sortOrder (broke on OPPO/ColorOS) |
+| Permission wall in LinkedAccountsScreen | Shows grant button if READ_SMS not granted |
+| Raw SMS body in metadata | `raw_source_text` stored at parse time, shown in TxnDetailScreen |
+| TxnDetailScreen: manual correction UI | Merchant, category pills, amount — PATCH /transactions/:id/correct |
+| TxnDetailScreen: Raw SMS log section | Expandable, shows sender, timestamp, full body |
+| SelfScreen: ALL CATEGORIES (not just expenses) | Investments in orange, income in green, expenses in red |
+| SelfScreen: Recent Transactions with pagination | All txns newest first, 15 at a time, Show more button |
+| Category pattern expansion | 50+ new merchant fragments: Instamart, SwiggyLimited, Zepto, Bharti, etc. |
+| Email account management | Add/remove Gmail/Outlook in onboarding + LinkedAccountsScreen |
+| Rust `/transactions/:id/correct` endpoint | Partial update, sets verified=true, logs corrected_at |
+| LinkedAccountsScreen | Full screen: SMS scan + email accounts + last scan summary |
+| Onboarding: bank_email step | Between SMS permission and login email step |
+| Home: SmsScanBanner | Import prompt / done summary, dismissible |
+
+### 🔄 STILL IN PROGRESS
+| ID | Issue | Priority |
+|----|-------|----------|
+| SMS parser merchant normalisation | JS should normalise before batch submit, not rely on getCat() fallback | HIGH |
+| Category assignment in batch | Rust keyword fallback added but needs expansion | MEDIUM |
+| Email parsing (Gmail OAuth) | Accounts registered, parsing not yet active | MEDIUM |
+| ML categorization | Training data accumulating via manual corrections | LOW |

@@ -236,6 +236,8 @@ pub struct TransactionRow {
     pub exclude_from_totals: bool,
     pub tz_offset:             String,
     pub metadata:              serde_json::Value,
+    pub raw_sms_body:          Option<String>,
+    pub raw_email_body:        Option<String>,
     pub original_amount:       Option<i32>,
     pub original_currency:     Option<String>,
     pub fx_rate_at_entry:      Option<f64>,
@@ -260,6 +262,8 @@ pub struct InsertTransaction {
     pub local_id:       Option<String>,
     pub tz_offset:          String,
     pub metadata:           serde_json::Value,
+    pub raw_sms_body:   Option<String>,
+    pub raw_email_body: Option<String>,
     pub original_amount:    Option<i32>,
     pub original_currency:  Option<String>,
     pub fx_rate_at_entry:   Option<f64>,
@@ -279,13 +283,15 @@ pub async fn insert_transaction(
             merchant, category, confidence, verified, source, sources,
             fingerprint, acct_suffix, txn_date,
             is_investment, is_subscription, is_cash,
-            local_id, tz_offset, original_amount, original_currency, fx_rate_at_entry, metadata, sync_state
+            local_id, tz_offset, original_amount, original_currency, fx_rate_at_entry, metadata, sync_state,
+            raw_sms_body, raw_email_body
         ) VALUES (
             $1, $2, $3::INT, $4,
             $5, $6, $7::SMALLINT, $8, $9, $10,
             $11, $12, $13,
             $14, $15, $16,
-            $17, $18, $19::INT, $20, $21::FLOAT8, $22, 'synced'
+            $17, $18, $19::INT, $20, $21::FLOAT8, $22, 'synced',
+            $23, $24
         )
         ON CONFLICT (user_id, fingerprint, txn_date) DO NOTHING
         RETURNING id
@@ -300,6 +306,8 @@ pub async fn insert_transaction(
         t.original_currency,
         t.fx_rate_at_entry as Option<f64>,
         t.metadata,
+        t.raw_sms_body,
+        t.raw_email_body,
     )
     .fetch_optional(pool)
     .await?;
@@ -365,7 +373,7 @@ pub async fn get_transactions(
             local_id, created_at,
             is_hidden, hidden_from_family, hidden_until, exclude_from_totals,
             tz_offset, original_amount, original_currency, fx_rate_at_entry,
-            metadata
+            metadata, raw_sms_body, raw_email_body
         FROM transactions
         WHERE (user_id = $1 OR ($4::int IS NOT NULL AND household_id = $4))
           AND txn_date BETWEEN $2 AND $3
@@ -484,7 +492,7 @@ pub async fn get_hidden_transactions(
             local_id, created_at,
             is_hidden, hidden_from_family, hidden_until, exclude_from_totals,
             tz_offset, original_amount, original_currency, fx_rate_at_entry,
-            metadata
+            metadata, raw_sms_body, raw_email_body
         FROM transactions
         WHERE user_id = $1
           AND deleted_at IS NULL

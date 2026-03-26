@@ -162,6 +162,8 @@ pub async fn ingest(
         fx_rate_at_entry:  None,
         metadata:          serde_json::json!({}),
         local_id:       input.local_id.clone(),
+        raw_sms_body:   None,
+        raw_email_body: None,
     };
 
     match insert_transaction(pool, &insert).await? {

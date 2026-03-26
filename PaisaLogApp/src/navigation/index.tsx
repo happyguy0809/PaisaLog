@@ -4,6 +4,7 @@ import { RefundTrackerScreen } from '../screens/account/RefundTrackerScreen';
 import { DeletedTransactionsScreen } from '../screens/account/DeletedTransactionsScreen';
 import { TargetsScreen } from '../screens/account/TargetsScreen';
 import { HiddenVaultScreen } from '../screens/account/HiddenVaultScreen';
+import { LinkedAccountsScreen } from '../screens/account/LinkedAccountsScreen';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { C } from '../design/tokens';
@@ -37,6 +38,7 @@ export function AppNavigator({
           <Stack.Screen name="HiddenVault" component={HiddenVaultScreen} options={{ headerShown: false }} />
           <Stack.Screen name="TransactionDetail" component={TxnDetailScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="Category" component={CategoryScreen} />
+          <Stack.Screen name="LinkedAccounts" component={LinkedAccountsScreen} options={{ headerShown: false }} />
           </>
         ) : (
           <Stack.Screen name="Onboarding" options={{ gestureEnabled: false }}>
