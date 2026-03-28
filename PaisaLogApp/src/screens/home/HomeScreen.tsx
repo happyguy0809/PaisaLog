@@ -39,6 +39,42 @@ function monthRange(d = dayjs()) {
 
 // ── Main screen ───────────────────────────────────────────────
 
+// Normalise raw bank merchant strings for display
+function normaliseMerchant(raw: string | null): string {
+  if (!raw) return '';
+  const m = raw.trim();
+  // Already clean (has spaces or is short)
+  if (m.includes(' ') && m.length < 30) return m;
+  // Known raw→clean mappings
+  const MAP: Record<string, string> = {
+    'ZEPTOMARKETPLACEPRIVATE': 'Zepto',
+    'SWIGGYLIMITED': 'Swiggy',
+    'BHARTIAIRTELLTD': 'Airtel',
+    'HPPAYDIRECTCREDITC': 'HP Petrol',
+    'INDIEJEWELFASHIONSPR': 'Indie Jewel',
+    'ETERNALLIMITED': 'Eternal Ltd',
+    'PROTEANEGOVTECHNOLOG': 'Protean eGov',
+    'TRAVELOGYONLINEPVTLTD': 'Travelogy',
+    'CLEARTRIPPRIVATELIMI': 'ClearTrip',
+    'AIRINDIALTD': 'Air India',
+    'NOBROKERTECHNOLOGI': 'NoBroker',
+    'HEISETASSEBEVERAGESP': 'Heiseta Beverages',
+    'BUNDLTECHNOLOGIESPRIVAT': 'Bundl Technologies',
+    'ONLINEGNN': 'Online GNN',
+    'RAZRELIANCERETAILLI': 'Reliance Retail',
+    'RAZHOUSIN': 'Raz Housing',
+    'RETAILCCMUM': 'Retail CC Mumbai',
+  };
+  const key = m.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (MAP[key]) return MAP[key];
+  // Camel-case long strings: CLEARTRIP → ClearTrip
+  if (m.length > 8 && m === m.toUpperCase()) {
+    return m.charAt(0) + m.slice(1).toLowerCase()
+      .replace(/([a-z])([A-Z])/g, '$1 $2');
+  }
+  return m;
+}
+
 export function HomeScreen() {
   const nav         = useNavigation<any>();
   const qc          = useQueryClient();
@@ -258,13 +294,13 @@ export function HomeScreen() {
                     <View style={styles.appRow}>
                       <View style={styles.appIconWrap}>
                         <Text style={styles.appIconText}>
-                          {(app.merchant ?? 'U')[0].toUpperCase()}
+                          {(normaliseMerchant(app.merchant) || 'U')[0].toUpperCase()}
                         </Text>
                       </View>
                       <View style={styles.appInfo}>
                         <Between>
                           <Small style={{ color: Colors.text.primary, fontFamily: Fonts.ui.medium }}>
-                            {app.merchant ?? 'Unknown'}
+                            {normaliseMerchant(app.merchant) || 'Unknown'}
                           </Small>
                           <Text style={[styles.appAmount, { color: Colors.spend.text }]}>
                             {fmt_money(app.debit_amount, 'INR', { compact: true })}
@@ -344,7 +380,7 @@ export function HomeScreen() {
                               style={{ color: Colors.text.primary, fontFamily: Fonts.ui.medium }}
                               numberOfLines={1}
                             >
-                              {txn.merchant ?? (txn.txn_type === 'credit' ? 'Received' : 'Payment')}
+                              {normaliseMerchant(txn.merchant) || (txn.txn_type === 'credit' ? 'Received' : 'Payment')}
                             </Small>
                             <Caption>{format_date(txn.txn_date, 'D MMM')}</Caption>
                           </View>

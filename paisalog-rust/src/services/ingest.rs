@@ -164,6 +164,8 @@ pub async fn ingest(
         local_id:       input.local_id.clone(),
         raw_sms_body:   None,
         raw_email_body: None,
+        payment_method: None,
+        account_type:   None,
     };
 
     match insert_transaction(pool, &insert).await? {

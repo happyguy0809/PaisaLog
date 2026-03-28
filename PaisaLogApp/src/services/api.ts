@@ -159,7 +159,7 @@ export const Transactions = {
     is_investment?: boolean; is_cash?: boolean; tz_offset?: string;
     original_amount?: number; original_currency?: string;
     fx_rate_at_entry?: number; metadata?: Record<string, any>;
-    raw_sms_body?: string; raw_email_body?: string;
+    raw_sms_body?: string; raw_email_body?: string; payment_method?: string;
   }> }) =>
     call<{ created: number; merged: number; skipped: number; errors: string[] }>(
       '/transactions/batch', { method: 'POST', body: JSON.stringify(d) }

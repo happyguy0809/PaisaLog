@@ -16,7 +16,7 @@ import { C, F, sp, br, fmt } from '../../design/tokens';
 
 import { T, Row, Between, Divider, Btn, Spacer, Chip } from '../../design/components';
 import { Transactions, Refunds, QK } from '../../services/api';
-import { CATS } from '../spend/categories';
+import { CATS, CATEGORY_KEYS } from '../spend/categories';
 import { capture_bill, pick_bill, get_photo, save_photo, delete_photo, get_compression_level, bill_photo } from '../../services/photo';
 
 import { getCat } from '../spend/categories';
@@ -113,6 +113,8 @@ export function TxnDetailScreen() {
   const [edit_merchant, setEditMerchant] = useState('');
   const [edit_category, setEditCategory] = useState('');
   const [edit_amount,   setEditAmount]   = useState('');
+  const [edit_custom_cat, setEditCustomCat] = useState('');
+  const [show_custom_cat, setShowCustomCat] = useState(false);
   const [show_raw_sms,  setShowRawSms]  = useState(false);
   const txnFallback: any = route.params?.txn ?? null;
 
@@ -151,8 +153,7 @@ export function TxnDetailScreen() {
   const correctMutation = useMutation({
     mutationFn: () => Transactions.correct(txnId, {
       merchant: edit_merchant.trim() || undefined,
-      category: edit_category || undefined,
-      amount:   edit_amount ? Math.round(parseFloat(edit_amount) * 100) : undefined,
+      category: (edit_custom_cat.trim() || edit_category) || undefined,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['txns'], exact: false });
@@ -227,7 +228,7 @@ export function TxnDetailScreen() {
     );
   }
 
-  const cat      = getCat(txn.category, txn.merchant);
+  const cat      = getCat(txn.category, txn.merchant, txn.raw_sms_body ?? undefined);
   const isDebit  = txn.txn_type === 'debit';
   const isInvest = txn.is_investment;
   const amtColor = isInvest ? C.investText : isDebit ? C.spendText : C.investText;
@@ -324,9 +325,57 @@ export function TxnDetailScreen() {
 
           {/* Details grid */}
           <View style={s.detailGrid}>
+            {/* Merchant — tap to edit inline */}
+            <View style={s.detailRow}>
+              <T.Cap style={{ flex: 1 }}>Merchant</T.Cap>
+              {show_correct ? (
+                <TextInput
+                  style={{ fontFamily: F.medium, fontSize: 13, color: C.textPrimary,
+                    borderBottomWidth: 1, borderBottomColor: C.accent, minWidth: 120, textAlign: 'right' }}
+                  value={edit_merchant}
+                  onChangeText={setEditMerchant}
+                  autoFocus
+                  returnKeyType="done"
+                />
+              ) : (
+                <TouchableOpacity onPress={() => { setEditMerchant(txn.merchant ?? ''); setEditCategory(txn.category ?? ''); setShowCorrect(true); }}>
+                  <T.Small style={{ fontFamily: F.medium, color: C.accent }}>
+                    {txn.merchant ?? '—'}  ✎
+                  </T.Small>
+                </TouchableOpacity>
+              )}
+            </View>
+            {/* Category — tap to pick */}
+            <View style={[s.detailRow, { flexDirection: 'column', alignItems: 'flex-start', paddingVertical: sp[3] }]}>
+              <Between style={{ width: '100%', marginBottom: show_correct ? sp[2] : 0 }}>
+                <T.Cap>Category</T.Cap>
+                <TouchableOpacity onPress={() => { setEditCategory(txn.category ?? ''); setEditMerchant(txn.merchant ?? ''); setShowCorrect(v => !v); }}>
+                  <Row style={{ gap: sp[1] }}>
+                    <Text style={{ fontSize: 13 }}>{cat.icon}</Text>
+                    <T.Small style={{ fontFamily: F.medium, color: show_correct ? C.accent : C.textPrimary }}>{cat.label}  ✎</T.Small>
+                  </Row>
+                </TouchableOpacity>
+              </Between>
+              {show_correct && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }}>
+                  <View style={{ flexDirection: 'row', gap: sp[2], paddingVertical: sp[2] }}>
+                    {Object.entries(CATS).filter(([k]) => k !== 'other').map(([key, c]) => (
+                      <TouchableOpacity key={key} onPress={() => setEditCategory(key)}
+                        style={{ paddingHorizontal: sp[2], paddingVertical: 4, borderRadius: br.full,
+                          backgroundColor: edit_category === key ? c.color + '22' : C.n200,
+                          borderWidth: 1, borderColor: edit_category === key ? c.color : C.borderFaint,
+                          flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Text style={{ fontSize: 11 }}>{c.icon}</Text>
+                        <Text style={{ fontFamily: F.medium, fontSize: 10,
+                          color: edit_category === key ? c.color : C.textSecondary }}>{c.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              )}
+            </View>
             {[
               { label: 'Type',       value: isInvest ? 'Investment' : isDebit ? 'Debit' : 'Credit' },
-              { label: 'Category',   value: cat.label },
               { label: 'Account',    value: txn.acct_suffix ? `···· ${txn.acct_suffix}` : '—' },
               { label: 'Source',     value: txn.sources ?? '—' },
               { label: 'Confidence', value: txn.confidence >= 80 ? 'High' : txn.confidence >= 50 ? 'Medium' : 'Low' },
@@ -420,6 +469,110 @@ export function TxnDetailScreen() {
               )}
             </View>
           )}
+          {/* ── Edit Transaction ─────────────────────────── */}
+          <TouchableOpacity
+            onPress={() => {
+              setEditMerchant(txn.merchant ?? '');
+              setEditCategory(txn.category ?? '');
+              setEditCustomCat('');
+              setShowCustomCat(false);
+              setShowCorrect(v => !v);
+            }}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+              paddingVertical: sp[3], paddingHorizontal: sp[4],
+              backgroundColor: C.n100, borderRadius: br.sm, marginBottom: sp[3] }}
+          >
+            <Row style={{ gap: sp[2] }}>
+              <Text style={{ fontSize: 15 }}>✏️</Text>
+              <T.Small style={{ fontFamily: F.medium }}>Edit transaction</T.Small>
+              {txn.metadata?.manually_corrected && (
+                <View style={{ backgroundColor: C.accentLight, borderRadius: br.full, paddingHorizontal: sp[2], paddingVertical: 1 }}>
+                  <T.Cap style={{ color: C.accent }}>Edited</T.Cap>
+                </View>
+              )}
+            </Row>
+            <Text style={{ color: C.textTertiary }}>{show_correct ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+
+          {show_correct && (
+            <View style={{ backgroundColor: C.cardBg, borderRadius: br.md, borderWidth: 0.5,
+              borderColor: C.borderDefault, padding: sp[4], marginBottom: sp[4] }}>
+
+              <T.Cap style={{ marginBottom: sp[2] }}>MERCHANT NAME</T.Cap>
+              <TextInput
+                style={s.noteInput}
+                value={edit_merchant}
+                onChangeText={setEditMerchant}
+                placeholder={txn.merchant ?? 'e.g. Swiggy, Amazon...'}
+                placeholderTextColor={C.textDisabled}
+                autoCapitalize="words"
+              />
+
+              <T.Cap style={{ marginTop: sp[3], marginBottom: sp[2] }}>CATEGORY</T.Cap>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: sp[2] }}>
+                <View style={{ flexDirection: 'row', gap: sp[2] }}>
+                  {Object.entries(CATS).filter(([k]) => k !== 'other').map(([key, cat]) => (
+                    <TouchableOpacity
+                      key={key}
+                      onPress={() => { setEditCategory(key); setShowCustomCat(false); setEditCustomCat(''); }}
+                      style={{ paddingHorizontal: sp[3], paddingVertical: sp[1], borderRadius: br.full,
+                        backgroundColor: edit_category === key ? cat.color + '22' : C.n200,
+                        borderWidth: 1, borderColor: edit_category === key ? cat.color : C.borderFaint,
+                        flexDirection: 'row', alignItems: 'center', gap: sp[1] }}
+                    >
+                      <Text style={{ fontSize: 12 }}>{cat.icon}</Text>
+                      <Text style={{ fontFamily: F.medium, fontSize: 11,
+                        color: edit_category === key ? cat.color : C.textSecondary }}>{cat.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+
+              <TouchableOpacity onPress={() => setShowCustomCat(v => !v)} style={{ marginBottom: sp[2] }}>
+                <T.Small color={C.accent}>{show_custom_cat ? '− Hide custom' : '+ Custom category'}</T.Small>
+              </TouchableOpacity>
+
+              {show_custom_cat && (
+                <TextInput
+                  style={[s.noteInput, { minHeight: 0, paddingVertical: sp[3], marginBottom: sp[3] }]}
+                  value={edit_custom_cat}
+                  onChangeText={setEditCustomCat}
+                  placeholder="e.g. Pet care, Gym, Education..."
+                  placeholderTextColor={C.textDisabled}
+                  autoCapitalize="words"
+                />
+              )}
+
+              <T.Cap style={{ marginBottom: sp[2] }}>NOTE</T.Cap>
+              <TextInput
+                style={[s.noteInput, { minHeight: 0, paddingVertical: sp[3] }]}
+                value={note}
+                onChangeText={setNote}
+                placeholder="Add a note..."
+                placeholderTextColor={C.textDisabled}
+                multiline
+              />
+
+              <Row style={{ gap: sp[3], marginTop: sp[4] }}>
+                <TouchableOpacity onPress={() => setShowCorrect(false)}
+                  style={{ flex: 1, padding: sp[3], borderRadius: br.sm, backgroundColor: C.n200, alignItems: 'center' }}>
+                  <T.Small style={{ fontFamily: F.medium }}>Cancel</T.Small>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    correctMutation.mutate();
+                    if (note !== (txn.note ?? '')) noteMutation.mutate();
+                  }}
+                  disabled={correctMutation.isPending}
+                  style={{ flex: 1, padding: sp[3], borderRadius: br.sm, backgroundColor: C.accent, alignItems: 'center' }}>
+                  <T.Small style={{ fontFamily: F.semibold, color: '#fff' }}>
+                    {correctMutation.isPending ? 'Saving…' : 'Save'}
+                  </T.Small>
+                </TouchableOpacity>
+              </Row>
+            </View>
+          )}
+
           {/* Note */}
           <View>
             <Between style={{ marginBottom: sp[3] }}>

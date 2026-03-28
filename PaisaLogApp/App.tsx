@@ -1,12 +1,14 @@
 // App.tsx
 import React, { useEffect } from 'react';
-import { Linking, StatusBar, Animated } from 'react-native';
+import { Linking, StatusBar, Animated, AppState, AppStateStatus } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppNavigator, navigationRef } from './src/navigation';
 import { start_sms_listener, stop_sms_listener, check_sms_permission } from './src/services/sms';
 import { Auth, Tok, storage } from './src/services/api';
+import { MPIN } from './src/services/mpin';
+import { MPINModal } from './src/components/MPINModal';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,6 +29,9 @@ export default function App() {
     storage.getString('onboarding_done') === 'true' &&
     !!Tok.access
   );
+  const [appLocked, setAppLocked] = React.useState(false);
+  const [lockError, setLockError]  = React.useState('');
+  const appState = React.useRef(AppState.currentState);
 
   // ── Deep link handler — must be inside component to access setIsOnboarded
   // Debug: log token state on mount
@@ -76,6 +81,24 @@ export default function App() {
     }
   }
 
+  // App lock — show MPIN when app comes to foreground
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      const lock_enabled = storage.getString('app_lock_enabled') === 'true';
+      const was_background = appState.current === 'background' || appState.current === 'inactive';
+      if (lock_enabled && was_background && next === 'active' && isOnboarded && MPIN.is_set()) {
+        setAppLocked(true);
+        setLockError('');
+      }
+      appState.current = next;
+    });
+    // Lock immediately on mount if enabled and pin is set
+    if (storage.getString('app_lock_enabled') === 'true' && isOnboarded && MPIN.is_set()) {
+      setAppLocked(true);
+    }
+    return () => sub.remove();
+  }, [isOnboarded]);
+
   // Start SMS listener if permission already granted
   useEffect(() => {
     if (!isOnboarded) return;
@@ -98,6 +121,29 @@ export default function App() {
           <StatusBar barStyle="dark-content" />
           <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
             <AppNavigator isOnboarded={isOnboarded} setIsOnboarded={setIsOnboarded} />
+            <MPINModal
+              visible={appLocked && isOnboarded}
+              mode="enter"
+              title="PaisaLog"
+              subtitle="Enter your PIN to continue"
+              error={lockError}
+              onSuccess={(pin) => {
+                if (MPIN.verify(pin)) {
+                  setAppLocked(false);
+                  setLockError('');
+                } else {
+                  setLockError('Wrong PIN. Try again.');
+                }
+              }}
+              onCancel={() => {}}
+              onForgotPin={() => {
+                // Sign out — only recovery option
+                Tok.clear();
+                storage.delete('onboarding_done');
+                setAppLocked(false);
+                setIsOnboarded(false);
+              }}
+            />
           </Animated.View>
         </QueryClientProvider>
       </SafeAreaProvider>

@@ -857,3 +857,101 @@ The app never silently ingests data without user knowledge.
 | Category assignment in batch | Rust keyword fallback added but needs expansion | MEDIUM |
 | Email parsing (Gmail OAuth) | Accounts registered, parsing not yet active | MEDIUM |
 | ML categorization | Training data accumulating via manual corrections | LOW |
+
+---
+## Belief 25 — Two-tier data architecture: Device-private vs Server-global
+
+### Core principle
+Customer data never leaves the device unencrypted. Global intelligence is crowd-sourced
+and anonymised — never linkable to any individual.
+
+### Tier 1 — Device only (customer-private)
+These tables live on the customer's device and in their encrypted backup only.
+Our server NEVER sees the plaintext of these tables.
+
+| Table | Purpose |
+|-------|---------|
+| `transactions` | All transaction records with amount, merchant, date, account |
+| `user_accounts` | Customer's own bank accounts and cards |
+| `user_account_details` | Account metadata: bank name, suffix, balance, payment method |
+| `customer_details` | Customer profile: name, city, age bracket |
+| `spend_contributions` | Raw input before anonymisation — deleted after aggregation |
+
+**Rules for Tier 1:**
+- No customer_id, email, phone, or any PII in any global table
+- Transactions stay on device — server only stores encrypted blob for backup
+- If customer deletes account: all Tier 1 data is hard-deleted within 30 days
+- Export always available — customer owns their data
+
+### Tier 2 — Server-global (shared intelligence)
+These tables are maintained on PaisaLog's server and synced to customer devices.
+They contain ZERO customer-identifiable information — only aggregated patterns.
+
+| Table | Purpose |
+|-------|---------|
+| `merchants` | Canonical merchant names, categories, LOB hints |
+| `merchant_aliases` | Raw string → merchant_id mappings (crowd-sourced) |
+| `spend_benchmarks` | Aggregated cohort benchmarks — no individual data |
+| `category_rules` | Global categorisation rules, updated centrally |
+
+**Rules for Tier 2:**
+- NEVER store customer_id, user_id, household_id, or any identifier
+- NEVER store individual transaction amounts or dates
+- Aggregation minimum: cohort must have ≥ 50 members before benchmark computed
+- merchant_aliases are crowd-sourced — contributed anonymously, no contributor tracked
+- spend_benchmarks store only: week, city_tier, age_bracket, category, p25/p50/p75
+- Any analyst with full access to Tier 2 must be unable to reconstruct any individual's transactions
+
+### What this prevents
+- Data breach of Tier 2 exposes zero customer financial data
+- Even a rogue PaisaLog employee cannot link Tier 2 data to a specific customer
+- Regulatory compliance: financial data stays on customer device (RBI guidelines)
+- Trust: we can publicly publish the Tier 2 schema without privacy concerns
+
+### Merchant intelligence model
+Merchant data flows one-way: Device → anonymised contribution → Tier 2 aggregation → all devices
+- Customer corrects "SWIGGYLIMITED" → "Swiggy" on their device
+- Correction is contributed anonymously as alias_raw + alias_canonical (no user_id)
+- When ≥ 10 devices contribute same alias: it gets promoted to global merchant_aliases
+- Devices sync merchant_aliases weekly (lightweight, ~500KB for top 10,000 merchants)
+
+### Payment method classification (device-only)
+Derived from SMS body at parse time, stored in transactions.payment_method:
+  'upi'        — UPI/BHIM/Google Pay/PhonePe patterns
+  'card'       — Credit/Debit card patterns  
+  'netbanking' — NEFT/IMPS/RTGS patterns
+  'emi'        — EMI/instalment patterns
+  'cash'       — ATM/cash withdrawal patterns
+  'wallet'     — Paytm/Mobikwik/Amazon Pay wallet patterns
+  null         — unknown/not parsed
+
+---
+## Belief 26 — Financial SMS detection by content, not sender
+
+### Problem with sender-based filtering
+Hardcoding bank names (HDFC, ICICI, BOB, SBI...) in code is brittle:
+- India has 10,000+ banks — no static list can be complete
+- Banks change their SMS sender IDs
+- Banks merge (e.g. Vijaya Bank → Bank of Baroda)
+- New payment rails and wallets appear constantly
+
+### Solution: content-based detection
+Detect financial SMS by what they SAY, not who sent them:
+- Contains amount pattern: Rs.X / INR X / ₹X
+- Contains transaction verb: debited / credited / spent / withdrawn
+- Contains account reference: A/C / Acct / account...XXXX
+- Contains payment rail: UPI / NEFT / IMPS / RTGS
+
+### Rules
+- `is_financial_sender(sender, body)` — body is the primary signal
+- Sender is only a fallback when body is unavailable
+- OTP messages are rejected first regardless of sender
+- Promotional messages without transaction verbs are rejected
+- Any registered SMS sender (6-char alpha) passes the sender check
+- No hardcoded bank name lists anywhere in the codebase
+
+### Config-driven sender hints (Tier 2, optional)
+- Server maintains a `sender_hints` table: sender_id → bank_name, account_type
+- Device syncs this weekly (lightweight, ~100KB)
+- Used ONLY for display purposes (showing "SBI Credit Card" instead of "AD-SBICRD-S")
+- Never used for filtering — content always wins

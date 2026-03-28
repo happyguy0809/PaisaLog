@@ -119,6 +119,8 @@ pub async fn ingest_one(
         local_id:       input.local_id,
         raw_sms_body:   None,
         raw_email_body: None,
+        payment_method: None,
+        account_type:   None,
     };
 
     match queries::insert_transaction(&state.pool, &insert).await? {
@@ -164,6 +166,8 @@ pub struct BatchItem {
     pub metadata:           Option<serde_json::Value>,
     pub raw_sms_body:   Option<String>,
     pub raw_email_body: Option<String>,
+    pub payment_method: Option<String>,
+    pub account_type:   Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -247,6 +251,8 @@ pub async fn ingest_batch(
             local_id:       item.local_id.clone(),
             raw_sms_body:   item.raw_sms_body.clone(),
             raw_email_body: item.raw_email_body.clone(),
+            payment_method: item.payment_method.clone(),
+            account_type:   item.account_type.clone(),
         };
 
         match queries::insert_transaction(&state.pool, &insert).await {
@@ -458,6 +464,8 @@ pub async fn promote(
         local_id:       None,
         raw_sms_body:   None,
         raw_email_body: None,
+        payment_method: None,
+        account_type:   None,
     };
 
     let txn_id = queries::insert_transaction(&state.pool, &insert).await?;
@@ -643,7 +651,7 @@ pub async fn deleted_list(
             local_id, created_at,
             is_hidden, hidden_from_family, hidden_until, exclude_from_totals,
             tz_offset, original_amount, original_currency, fx_rate_at_entry,
-            metadata, raw_sms_body, raw_email_body
+            metadata, raw_sms_body, raw_email_body, payment_method, account_type
         FROM transactions
         WHERE user_id = $1
           AND deleted_at IS NOT NULL

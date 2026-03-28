@@ -62,6 +62,10 @@ export interface parsed_sms {
   // Foreign currency
   original_currency: string | null;  // detected currency code e.g. 'AED', 'USD'
   original_amount:   number | null;  // amount in original currency smallest unit
+  // Payment method
+  payment_method: 'upi' | 'card' | 'netbanking' | 'emi' | 'cash' | 'wallet' | null;
+  // Balance
+  available_balance: number | null;  // in paise, null if not present in SMS
   // Refund tracking
   is_refund:     boolean;
   refund_type:   'refund' | 'reversal' | 'cashback' | null;
@@ -164,6 +168,8 @@ export function parse_sms(sender: string, body: string): parsed_sms | null {
 
   return { amount, txn_type, merchant, acct_suffix, sender, body,
            original_currency, original_amount,
+           payment_method,
+           available_balance,
            is_refund: is_refund || txn_type === 'credit', refund_type, rrn, arn, reference_no };
 }
 
@@ -300,15 +306,32 @@ export function stop_sms_listener(): void {
 }
 
 // ── Financial sender pre-filter ──────────────────────────────
-const FIN_FRAGMENTS = [
-  'BANK','HDFC','ICICI','SBI','AXIS','KOTAK','INDUS','YESB','PNB',
-  'BOI','CANARA','UNION','IDFC','PAYTM','AMEX','CITI','STANC',
-  'CARD','UPI','NEFT','IMPS','CREDIT','DEBIT','WALLET','RUPAY',
+// Financial SMS detection based on CONTENT not sender name.
+// Sender lists break when banks change IDs, merge, or new banks appear.
+// Instead: if the SMS body contains financial signals → process it.
+const FIN_BODY_PATTERNS = [
+  /(?:Rs\.?|INR|₹)\s*[\d,]+/i,              // amount with currency
+  /debited|credited|spent|withdrawn/i,        // transaction verbs
+  /a\/c|acct|account.*\d{3}/i,               // account reference
+  /upi|neft|imps|rtgs/i,                     // payment rails
+  /otp\s+is\s+\d{4,6}/i,                    // OTP — will be filtered by OTP check
 ];
-export function is_financial_sender(sender: string): boolean {
-  const raw      = sender.toUpperCase();
-  const stripped = raw.replace(/^[A-Z]{2}-/, '');
-  return FIN_FRAGMENTS.some(f => raw.includes(f) || stripped.includes(f));
+
+export function is_financial_sender(sender: string, body?: string): boolean {
+  // If body is provided, detect by content (more reliable)
+  if (body) {
+    // Reject OTPs first
+    if (/OTP|one.?time.?pass/i.test(body)) return false;
+    // Reject promotional patterns
+    if (/offer|discount|cashback.*earn|click here|visit us|unsubscribe/i.test(body) &&
+        !(/debited|credited|spent|withdrawn/i.test(body))) return false;
+    return FIN_BODY_PATTERNS.some(p => p.test(body));
+  }
+  // Fallback: sender-based (kept for backward compat but very permissive)
+  const raw = sender.toUpperCase().replace(/^[A-Z]{2}-/, '');
+  // Accept any sender that looks like a bank/financial institution code
+  // 6-char alpha codes are typically registered SMS senders
+  return raw.length >= 3;
 }
 
 // ── Historical backfill ───────────────────────────────────────
@@ -353,7 +376,7 @@ export async function backfill_sms(opts: {
   emit({ status: 'filtering', total: all.length });
   const financial = all.filter(
     m => m.timestamp >= from_ms && m.timestamp <= to_ms
-      && is_financial_sender(m.sender ?? '')
+      && is_financial_sender(m.sender ?? '', m.body ?? '')
   );
   emit({ status: 'parsing', filtered: financial.length });
   let tz_off = '+05:30';
@@ -385,7 +408,8 @@ export async function backfill_sms(opts: {
         source_type:      'sms_backfill',
         sms_timestamp_ms: msg.timestamp,
       },
-      raw_sms_body: msg.body ?? '',
+      raw_sms_body:    msg.body ?? '',
+      payment_method:  parsed.payment_method ?? undefined,
     });
     emit({ parsed: prog.parsed + 1 });
   }

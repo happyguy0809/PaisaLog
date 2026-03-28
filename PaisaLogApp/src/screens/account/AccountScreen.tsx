@@ -15,6 +15,7 @@ import {
 } from '../../design/components';
 import { User, Tok, Transactions, HouseholdApi, Export, storage, QK } from '../../services/api';
 import { MPIN } from '../../services/mpin';
+import { MPINModal } from '../../components/MPINModal';
 
 import { fmt_money } from '../../utils/money';
 
@@ -87,6 +88,11 @@ export function AccountScreen({ setIsOnboarded }: { setIsOnboarded?: (v: boolean
   const nav      = useNavigation<any>();
   const qc       = useQueryClient();
   const [showLog, setShowLog] = useState(false);
+  const [appLockEnabled, setAppLockEnabled] = React.useState(storage.getString('app_lock_enabled') === 'true');
+  const [showPinSetup,   setShowPinSetup]   = React.useState(false);
+  const [pinSetupStep,   setPinSetupStep]   = React.useState<'setup'|'confirm'>('setup');
+  const [pinFirst,       setPinFirst]       = React.useState('');
+  const [pinError,       setPinError]       = React.useState('');
 
   const { data: me, isLoading } = useQuery({ queryKey: QK.me, queryFn: User.me });
 
@@ -261,6 +267,56 @@ export function AccountScreen({ setIsOnboarded }: { setIsOnboarded?: (v: boolean
           </Between>
         </Card>
 
+        {/* Security — App lock */}
+        <T.Cap style={s.secHdr}>SECURITY</T.Cap>
+        <Card padding={0} style={{ overflow: 'hidden', marginBottom: sp[4] }}>
+          <Between style={s.switchRow}>
+            <View style={{ flex: 1, marginRight: sp[4] }}>
+              <T.Small style={{ fontFamily: F.medium, color: C.textPrimary }}>App lock (PIN)</T.Small>
+              <T.Cap>{appLockEnabled ? 'PIN required on every open' : 'No PIN required'}</T.Cap>
+            </View>
+            <Switch
+              value={appLockEnabled}
+              onValueChange={v => {
+                if (v) {
+                  if (MPIN.is_set()) {
+                    storage.set('app_lock_enabled', 'true');
+                    setAppLockEnabled(true);
+                  } else {
+                    setPinSetupStep('setup'); setPinFirst(''); setPinError('');
+                    setShowPinSetup(true);
+                  }
+                } else {
+                  storage.set('app_lock_enabled', 'false');
+                  setAppLockEnabled(false);
+                }
+              }}
+              trackColor={{ false: C.n300, true: C.accent }}
+              thumbColor={C.white}
+            />
+          </Between>
+        </Card>
+        <MPINModal
+          visible={showPinSetup}
+          mode={pinSetupStep}
+          title={pinSetupStep === 'setup' ? 'Set app PIN' : 'Confirm PIN'}
+          subtitle={pinSetupStep === 'setup' ? 'Choose a 4-digit PIN' : 'Enter PIN again to confirm'}
+          error={pinError}
+          onSuccess={(pin) => {
+            if (pinSetupStep === 'setup') {
+              setPinFirst(pin); setPinSetupStep('confirm'); setPinError('');
+            } else {
+              if (pin === pinFirst) {
+                MPIN.set(pin); storage.set('app_lock_enabled', 'true');
+                setAppLockEnabled(true); setShowPinSetup(false);
+              } else {
+                setPinError('PINs do not match. Try again.');
+                setPinSetupStep('setup'); setPinFirst('');
+              }
+            }
+          }}
+          onCancel={() => { setShowPinSetup(false); setPinError(''); }}
+        />
         {/* Raw signal log */}
         <Between style={[s.secHdr, { paddingRight: sp[4] }]}>
           <T.Cap>RAW SIGNAL LOG</T.Cap>

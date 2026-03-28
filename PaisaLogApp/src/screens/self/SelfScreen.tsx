@@ -24,6 +24,27 @@ const TABS = [
   { label: 'Investments', color: CAT.investment },
 ];
 
+function normaliseMerchant(raw: string | null): string {
+  if (!raw) return '';
+  const m = raw.trim();
+  if (m.includes(' ') && m.length < 30) return m;
+  const MAP: Record<string, string> = {
+    'ZEPTOMARKETPLACEPRIVATE': 'Zepto', 'SWIGGYLIMITED': 'Swiggy',
+    'BHARTIAIRTELLTD': 'Airtel', 'HPPAYDIRECTCREDITC': 'HP Petrol',
+    'INDIEJEWELFASHIONSPR': 'Indie Jewel', 'ETERNALLIMITED': 'Eternal Ltd',
+    'PROTEANEGOVTECHNOLOG': 'Protean eGov', 'TRAVELOGYONLINEPVTLTD': 'Travelogy',
+    'CLEARTRIPPRIVATELIMI': 'ClearTrip', 'AIRINDIALTD': 'Air India',
+    'NOBROKERTECHNOLOGI': 'NoBroker', 'HEISETASSEBEVERAGESP': 'Heiseta',
+    'BUNDLTECHNOLOGIESPRIVAT': 'Bundl', 'ONLINEGNN': 'Online GNN',
+    'RAZRELIANCERETAILLI': 'Reliance Retail', 'INSTAMART': 'Instamart',
+  };
+  const key = m.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (MAP[key]) return MAP[key];
+  if (m.length > 12 && m === m.toUpperCase())
+    return m.charAt(0) + m.slice(1).toLowerCase();
+  return m;
+}
+
 function make_range(offset = 0) {
   const d = dayjs().subtract(offset, 'month');
   return {
@@ -79,7 +100,7 @@ function TxnTray({ title, txns, visible, onClose }: any) {
                     <Text>{t.is_investment ? '📈' : isD ? '↑' : '↓'}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <T.Small style={{ fontFamily: F.medium, color: C.textPrimary }}>{t.merchant ?? (isD ? 'Payment' : 'Received')}</T.Small>
+                    <T.Small style={{ fontFamily: F.medium, color: C.textPrimary }}>{normaliseMerchant(t.merchant) || (isD ? 'Payment' : 'Received')}</T.Small>
                     <T.Cap>{format_date(t.txn_date, 'D MMM')}</T.Cap>
                   </View>
                   <Text style={{ fontFamily: F.semibold, fontSize: 14, color: col }}>{isD ? '-' : '+'}{fmt_money(t.amount, 'INR', { compact: true })}</Text>
@@ -127,7 +148,7 @@ function RecentTxns({ all_txns }: any) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontFamily: F.medium, fontSize: 13, color: C.textPrimary }} numberOfLines={1}>
-                    {t.merchant ?? (isD ? 'Payment' : 'Received')}
+                    {normaliseMerchant(t.merchant) || (isD ? 'Payment' : 'Received')}
                   </Text>
                   <Text style={{ fontFamily: F.regular, fontSize: 11, color: C.textTertiary }}>
                     {cat.label}  ·  {format_date(t.txn_date, 'D MMM')}
@@ -272,7 +293,16 @@ function IncomeTab({ all_txns }: any) {
   const [tray, setTray] = useState<any>(null);
   const filtered = useMemo(() => (all_txns ?? []).filter((t: any) => t.txn_type === 'credit'), [all_txns]);
   const grand = filtered.reduce((s: number, t: any) => s + t.amount, 0);
-  const by_src = useMemo(() => { const m: Record<string, any> = {}; filtered.forEach((t: any) => { const k = t.merchant ?? 'Other'; if (!m[k]) m[k] = { total: 0, txns: [] }; m[k].total += t.amount; m[k].txns.push(t); }); return Object.entries(m).sort((a: any, b: any) => b[1].total - a[1].total); }, [filtered]);
+  const by_cat_inc = useMemo(() => {
+    const m: Record<string, any> = {};
+    filtered.forEach((t: any) => {
+      const k = t.category ?? 'income';
+      if (!m[k]) m[k] = { total: 0, txns: [] };
+      m[k].total += t.amount; m[k].txns.push(t);
+    });
+    return Object.entries(m).sort((a: any, b: any) => b[1].total - a[1].total);
+  }, [filtered]);
+  const by_src = useMemo(() => { const m: Record<string, any> = {}; filtered.forEach((t: any) => { const k = normaliseMerchant(t.merchant) || 'Bank Credit'; if (!m[k]) m[k] = { total: 0, txns: [] }; m[k].total += t.amount; m[k].txns.push(t); }); return Object.entries(m).sort((a: any, b: any) => b[1].total - a[1].total); }, [filtered]);
   return (
     <ScrollView contentContainerStyle={{ padding: sp[4] }}>
       <Card padding={sp[4]} style={{ marginBottom: sp[4], backgroundColor: '#F2FAF4', borderWidth: 1, borderColor: '#C3E6CE' }}>
@@ -280,13 +310,40 @@ function IncomeTab({ all_txns }: any) {
         <Text style={{ fontFamily: F.bold, fontSize: 26, color: CAT.income, letterSpacing: -0.5, marginTop: 2 }}>{fmt_money(grand)}</Text>
         <T.Cap style={{ marginTop: 2 }}>{filtered.length} transactions</T.Cap>
       </Card>
+      <T.Cap style={s.secHdr}>BY CATEGORY</T.Cap>
+      <Card padding={0} style={{ overflow: 'hidden', marginBottom: sp[4] }}>
+        {by_cat_inc.map(([name, d]: any, i) => (
+          <View key={name}>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => setTray({ title: getCat(name, null).label, txns: d.txns })}>
+              <View style={{ padding: sp[4] }}>
+                <Between style={{ marginBottom: sp[2] }}>
+                  <View style={{ flex: 1 }}>
+                    <Row style={{ gap: sp[2] }}>
+                      <Text style={{ fontSize: 14 }}>{getCat(name, null).icon}</Text>
+                      <T.Small style={{ fontFamily: F.medium }}>{getCat(name, null).label}</T.Small>
+                    </Row>
+                    <T.Cap>{d.txns.length} txns · {grand > 0 ? Math.round(d.total / grand * 100) : 0}%</T.Cap>
+                  </View>
+                  <Row style={{ gap: sp[2] }}>
+                    <Text style={{ fontFamily: F.semibold, fontSize: 14, color: CAT.income }}>{fmt_money(d.total, 'INR', { compact: true })}</Text>
+                    <Text style={{ color: C.textTertiary, fontSize: 14 }}>›</Text>
+                  </Row>
+                </Between>
+                <Bar segments={[{ value: d.total, color: CAT.income }]} total={grand} height={5} />
+              </View>
+            </TouchableOpacity>
+            {i < by_cat_inc.length - 1 && <Divider />}
+          </View>
+        ))}
+        {by_cat_inc.length === 0 && <View style={{ padding: sp[8], alignItems: 'center' }}><T.Cap>No income categories</T.Cap></View>}
+      </Card>
       <T.Cap style={s.secHdr}>BY SOURCE</T.Cap>
       <Card padding={0} style={{ overflow: 'hidden', marginBottom: sp[16] }}>
         {by_src.map(([name, d]: any, i) => (
           <View key={name}>
             <TouchableOpacity activeOpacity={0.7} onPress={() => setTray({ title: name, txns: d.txns })}>
               <View style={{ padding: sp[4] }}>
-                <Between style={{ marginBottom: sp[2] }}><View style={{ flex: 1 }}><T.Small style={{ fontFamily: F.medium }}>{getCat(name, null).label}</T.Small><T.Cap>{d.txns.length} txns · {grand > 0 ? Math.round(d.total / grand * 100) : 0}%</T.Cap></View><Row style={{ gap: sp[2] }}><Text style={{ fontFamily: F.semibold, fontSize: 14, color: CAT.income }}>{fmt_money(d.total, 'INR', { compact: true })}</Text><Text style={{ color: C.textTertiary, fontSize: 14 }}>›</Text></Row></Between>
+                <Between style={{ marginBottom: sp[2] }}><View style={{ flex: 1 }}><T.Small style={{ fontFamily: F.medium }}>{name}</T.Small><T.Cap>{d.txns.length} txns · {grand > 0 ? Math.round(d.total / grand * 100) : 0}%</T.Cap></View><Row style={{ gap: sp[2] }}><Text style={{ fontFamily: F.semibold, fontSize: 14, color: CAT.income }}>{fmt_money(d.total, 'INR', { compact: true })}</Text><Text style={{ color: C.textTertiary, fontSize: 14 }}>›</Text></Row></Between>
                 <Bar segments={[{ value: d.total, color: CAT.income }]} total={grand} height={5} />
               </View>
             </TouchableOpacity>
@@ -318,12 +375,13 @@ function ExpensesTab({ all_txns }: any) {
       return b[1].total - a[1].total;
     });
   }, [filtered]);
-  const by_mer = useMemo(() => { const m: Record<string, any> = {}; filtered.forEach((t: any) => { const k = t.merchant ?? 'Other'; if (!m[k]) m[k] = { total: 0, txns: [] }; m[k].total += t.amount; m[k].txns.push(t); }); return Object.entries(m).sort((a: any, b: any) => b[1].total - a[1].total); }, [filtered]);
-  function R({ name, d }: any) {
+  const by_mer = useMemo(() => { const m: Record<string, any> = {}; filtered.forEach((t: any) => { const k = normaliseMerchant(t.merchant) || 'Unknown'; if (!m[k]) m[k] = { total: 0, txns: [] }; m[k].total += t.amount; m[k].txns.push(t); }); return Object.entries(m).sort((a: any, b: any) => b[1].total - a[1].total); }, [filtered]);
+  function R({ name, d, is_cat = false }: any) {
+    const display = is_cat ? getCat(name, null).label : normaliseMerchant(name);
     return (
-      <TouchableOpacity activeOpacity={0.7} onPress={() => setTray({ title: name, txns: d.txns })}>
+      <TouchableOpacity activeOpacity={0.7} onPress={() => setTray({ title: display, txns: d.txns })}>
         <View style={{ padding: sp[4] }}>
-          <Between style={{ marginBottom: sp[2] }}><View style={{ flex: 1 }}><T.Small style={{ fontFamily: F.medium }}>{getCat(name, null).label}</T.Small><T.Cap>{d.txns.length} txns · {grand > 0 ? Math.round(d.total / grand * 100) : 0}%</T.Cap></View><Row style={{ gap: sp[2] }}><Text style={{ fontFamily: F.semibold, fontSize: 14, color: CAT.expense }}>{fmt_money(d.total, 'INR', { compact: true })}</Text><Text style={{ color: C.textTertiary, fontSize: 14 }}>›</Text></Row></Between>
+          <Between style={{ marginBottom: sp[2] }}><View style={{ flex: 1 }}><T.Small style={{ fontFamily: F.medium }}>{display}</T.Small><T.Cap>{d.txns.length} txns · {grand > 0 ? Math.round(d.total / grand * 100) : 0}%</T.Cap></View><Row style={{ gap: sp[2] }}><Text style={{ fontFamily: F.semibold, fontSize: 14, color: CAT.expense }}>{fmt_money(d.total, 'INR', { compact: true })}</Text><Text style={{ color: C.textTertiary, fontSize: 14 }}>›</Text></Row></Between>
           <Bar segments={[{ value: d.total, color: CAT.expense }]} total={grand} height={5} />
         </View>
       </TouchableOpacity>
@@ -338,7 +396,7 @@ function ExpensesTab({ all_txns }: any) {
       </Card>
       <T.Cap style={s.secHdr}>BY CATEGORY</T.Cap>
       <Card padding={0} style={{ overflow: 'hidden', marginBottom: sp[4] }}>
-        {by_cat.map(([n, d]: any, i) => <View key={n}><R name={n} d={d} />{i < by_cat.length - 1 && <Divider />}</View>)}
+        {by_cat.map(([n, d]: any, i) => <View key={n}><R name={n} d={d} is_cat={true} />{i < by_cat.length - 1 && <Divider />}</View>)}
         {by_cat.length === 0 && <View style={{ padding: sp[8], alignItems: 'center' }}><T.Cap>No expenses</T.Cap></View>}
       </Card>
       <T.Cap style={s.secHdr}>BY MERCHANT / APP</T.Cap>
@@ -354,7 +412,16 @@ function InvestmentsTab({ all_txns }: any) {
   const [tray, setTray] = useState<any>(null);
   const filtered = useMemo(() => (all_txns ?? []).filter((t: any) => t.is_investment), [all_txns]);
   const grand = filtered.reduce((s: number, t: any) => s + t.amount, 0);
-  const by_plt = useMemo(() => { const m: Record<string, any> = {}; filtered.forEach((t: any) => { const k = t.merchant ?? 'Other'; if (!m[k]) m[k] = { total: 0, txns: [] }; m[k].total += t.amount; m[k].txns.push(t); }); return Object.entries(m).sort((a: any, b: any) => b[1].total - a[1].total); }, [filtered]);
+  const by_cat_inv = useMemo(() => {
+    const m: Record<string, any> = {};
+    filtered.forEach((t: any) => {
+      const k = t.category ?? 'investment';
+      if (!m[k]) m[k] = { total: 0, txns: [] };
+      m[k].total += t.amount; m[k].txns.push(t);
+    });
+    return Object.entries(m).sort((a: any, b: any) => b[1].total - a[1].total);
+  }, [filtered]);
+  const by_plt = useMemo(() => { const m: Record<string, any> = {}; filtered.forEach((t: any) => { const k = normaliseMerchant(t.merchant) || (t.category ? getCat(t.category, null).label : 'Investment'); if (!m[k]) m[k] = { total: 0, txns: [] }; m[k].total += t.amount; m[k].txns.push(t); }); return Object.entries(m).sort((a: any, b: any) => b[1].total - a[1].total); }, [filtered]);
   return (
     <ScrollView contentContainerStyle={{ padding: sp[4] }}>
       <Card padding={sp[4]} style={{ marginBottom: sp[4], backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#FDD9AA' }}>
@@ -362,13 +429,37 @@ function InvestmentsTab({ all_txns }: any) {
         <Text style={{ fontFamily: F.bold, fontSize: 26, color: CAT.investment, letterSpacing: -0.5, marginTop: 2 }}>{fmt_money(grand)}</Text>
         <T.Cap style={{ marginTop: 2 }}>{filtered.length} transactions</T.Cap>
       </Card>
+      <T.Cap style={s.secHdr}>BY CATEGORY</T.Cap>
+      <Card padding={0} style={{ overflow: 'hidden', marginBottom: sp[4] }}>
+        {by_cat_inv.map(([name, d]: any, i) => (
+          <View key={name}>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => setTray({ title: getCat(name, null).label, txns: d.txns })}>
+              <View style={{ padding: sp[4] }}>
+                <Between style={{ marginBottom: sp[2] }}>
+                  <Row style={{ gap: sp[2], flex: 1 }}>
+                    <Text style={{ fontSize: 14 }}>{getCat(name, null).icon}</Text>
+                    <T.Small style={{ fontFamily: F.medium }}>{getCat(name, null).label}</T.Small>
+                  </Row>
+                  <Row style={{ gap: sp[2] }}>
+                    <Text style={{ fontFamily: F.semibold, fontSize: 14, color: CAT.investment }}>{fmt_money(d.total, 'INR', { compact: true })}</Text>
+                    <Text style={{ color: C.textTertiary }}>›</Text>
+                  </Row>
+                </Between>
+                <Bar segments={[{ value: d.total, color: CAT.investment }]} total={grand} height={5} />
+              </View>
+            </TouchableOpacity>
+            {i < by_cat_inv.length - 1 && <Divider />}
+          </View>
+        ))}
+        {by_cat_inv.length === 0 && <View style={{ padding: sp[8], alignItems: 'center' }}><T.Cap>No categories</T.Cap></View>}
+      </Card>
       <T.Cap style={s.secHdr}>BY PLATFORM</T.Cap>
       <Card padding={0} style={{ overflow: 'hidden', marginBottom: sp[16] }}>
         {by_plt.map(([n, d]: any, i) => (
           <View key={n}>
-            <TouchableOpacity activeOpacity={0.7} onPress={() => setTray({ title: n, txns: d.txns })}>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => setTray({ title: normaliseMerchant(n) || n, txns: d.txns })}>
               <View style={{ padding: sp[4] }}>
-                <Between style={{ marginBottom: sp[2] }}><View style={{ flex: 1 }}><T.Small style={{ fontFamily: F.medium }}>{n}</T.Small><T.Cap>{d.txns.length} txns</T.Cap></View><Row style={{ gap: sp[2] }}><Text style={{ fontFamily: F.semibold, fontSize: 14, color: CAT.investment }}>{fmt_money(d.total, 'INR', { compact: true })}</Text><Text style={{ color: C.textTertiary, fontSize: 14 }}>›</Text></Row></Between>
+                <Between style={{ marginBottom: sp[2] }}><View style={{ flex: 1 }}><T.Small style={{ fontFamily: F.medium }}>{normaliseMerchant(n) || n}</T.Small><T.Cap>{d.txns.length} txns</T.Cap></View><Row style={{ gap: sp[2] }}><Text style={{ fontFamily: F.semibold, fontSize: 14, color: CAT.investment }}>{fmt_money(d.total, 'INR', { compact: true })}</Text><Text style={{ color: C.textTertiary, fontSize: 14 }}>›</Text></Row></Between>
                 <Bar segments={[{ value: d.total, color: CAT.investment }]} total={grand} height={5} />
               </View>
             </TouchableOpacity>
@@ -387,11 +478,20 @@ export function SelfScreen() {
   const [tab, setTab]       = useState(0);
   const [range, setRange]   = useState(make_range(0));
   const [showF, setShowF]   = useState(false);
+  const [acct_filter, setAcctFilter] = useState<string|null>(null);
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
 
   const { data: me }      = useQuery({ queryKey: QK.me, queryFn: User.me });
   const { data: summary } = useQuery({ queryKey: QK.summary(range), queryFn: () => Transactions.summary(range) });
-  const { data: txns }    = useQuery({ queryKey: QK.txns({ ...range, limit: 500 }), queryFn: () => Transactions.list({ ...range, limit: 500 }) });
+  const { data: raw_txns } = useQuery({ queryKey: QK.txns({ ...range, limit: 500 }), queryFn: () => Transactions.list({ ...range, limit: 500 }) });
+  const { data: all_txns_for_accounts } = useQuery({
+    queryKey: ['txns_all_accounts'],
+    queryFn:  () => Transactions.list({ start: '2020-01-01', end: new Date().toISOString().split('T')[0], limit: 2000 }),
+    staleTime: 10 * 60 * 1000,
+  });
+  const txns = React.useMemo(() => acct_filter
+    ? (raw_txns ?? []).filter((t: any) => t.acct_suffix === acct_filter)
+    : (raw_txns ?? []), [raw_txns, acct_filter]);
   const { data: targets } = useQuery({ queryKey: ['personal_targets'], queryFn: PersonalTargets.get });
 
   // Filter sheet
@@ -403,7 +503,29 @@ export function SelfScreen() {
   const [ce, setCe] = useState(range.end);
   useEffect(() => { if (showF) { setCs(range.start); setCe(range.end); } }, [showF]);
 
-  const filter_active = range.label !== 'This month';
+  const filter_active = range.label !== 'This month' || !!acct_filter;
+  const accounts = React.useMemo(() => {
+    const seen = new Set<string>();
+    const result: any[] = [];
+    // Use ALL transactions for account list
+    (all_txns_for_accounts ?? []).forEach((t: any) => {
+      if (!t.acct_suffix || seen.has(t.acct_suffix)) return;
+      seen.add(t.acct_suffix);
+      const sender = t.metadata?.sender_id ?? '';
+      const bank = sender.includes('CRD') || sender.includes('CREDIT') ? 'Credit Card'
+                 : sender.includes('PSG') || sender.includes('SAV') ? 'Savings'
+                 : sender.includes('INB') ? 'Net Banking' : 'Account';
+      result.push({ suffix: t.acct_suffix, bank });
+    });
+    return result;
+  }, [all_txns_for_accounts]);
+
+  // Which accounts have txns in current date range
+  const active_accounts = React.useMemo(() => {
+    const s = new Set<string>();
+    (raw_txns ?? []).forEach((t: any) => { if (t.acct_suffix) s.add(t.acct_suffix); });
+    return s;
+  }, [raw_txns]);
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -449,7 +571,7 @@ export function SelfScreen() {
             <ScrollView contentContainerStyle={{ padding: sp[4] }}>
               <Between style={{ marginBottom: sp[4] }}>
                 <T.Label>Date range</T.Label>
-                <TouchableOpacity onPress={() => { setRange(make_range(0)); setShowF(false); }}><T.Small color={C.accent}>Reset</T.Small></TouchableOpacity>
+                <TouchableOpacity onPress={() => { setRange(make_range(0)); setAcctFilter(null); setShowF(false); }}><T.Small color={C.accent}>Reset</T.Small></TouchableOpacity>
               </Between>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp[2], marginBottom: sp[3] }}>
                 {[0, 1, 2, 3].map(i => { const p = make_range(i); const a = p.start === cs && p.end === ce; return (
@@ -458,6 +580,38 @@ export function SelfScreen() {
                   </TouchableOpacity>
                 ); })}
               </View>
+              {accounts.length > 1 && (
+                <>
+                  <Between style={{ marginBottom: sp[2], marginTop: sp[2] }}>
+                    <T.Label>Account</T.Label>
+                    {acct_filter && (
+                      <TouchableOpacity onPress={() => setAcctFilter(null)}>
+                        <T.Small color={C.accent}>Clear</T.Small>
+                      </TouchableOpacity>
+                    )}
+                  </Between>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp[2], marginBottom: sp[3] }}>
+                    <TouchableOpacity
+                      style={{ paddingHorizontal: sp[3], paddingVertical: sp[1], borderRadius: br.full,
+                        backgroundColor: !acct_filter ? C.accentLight : C.n[200],
+                        borderWidth: 1, borderColor: !acct_filter ? C.accentBorder : C.borderFaint }}
+                      onPress={() => setAcctFilter(null)}>
+                      <Text style={{ fontFamily: F.medium, fontSize: 12,
+                        color: !acct_filter ? C.accent : C.textSecondary }}>All accounts</Text>
+                    </TouchableOpacity>
+                    {accounts.map((a: any) => (
+                      <TouchableOpacity key={a.suffix}
+                        style={{ paddingHorizontal: sp[3], paddingVertical: sp[1], borderRadius: br.full,
+                          backgroundColor: acct_filter === a.suffix ? C.accentLight : C.n[200],
+                          borderWidth: 1, borderColor: acct_filter === a.suffix ? C.accentBorder : C.borderFaint }}
+                        onPress={() => setAcctFilter(a.suffix)}>
+                        <Text style={{ fontFamily: F.medium, fontSize: 12,
+                          color: acct_filter === a.suffix ? C.accent : C.textSecondary }}>···· {a.suffix}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
               <Spacer h={sp[3]} />
               <Btn label="Apply" onPress={() => { const lbl = `${format_date(cs, 'DD-MMM-YY')} – ${format_date(ce, 'DD-MMM-YY')}`; setRange({ start: cs, end: ce, label: lbl }); setShowF(false); }} variant="primary" size="lg" fullWidth />
               <Spacer h={sp[4]} />
