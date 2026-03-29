@@ -473,6 +473,17 @@ export function ToolsScreen() {
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}><T.H>Tools</T.H></View>
       <View style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: C.borderFaint }}>
+              {/* SMS Review Queue */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => nav.navigate('SmsReview' as any)}
+                style={{ flexDirection: 'row', alignItems: 'center', padding: 14, backgroundColor: '#fff', borderRadius: 10, marginBottom: 8 }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '600', flex: 1, fontFamily: 'DM Sans' }}>
+                  📋 SMS Review Queue
+                </Text>
+                <Text style={{ fontSize: 12, color: '#888', fontFamily: 'DM Sans' }}>›</Text>
+              </TouchableOpacity>
         <TouchableOpacity onPress={() => setToolTab('tools')}
           style={{ flex: 1, alignItems: 'center', paddingVertical: sp[2],
             borderBottomWidth: 2, borderBottomColor: toolTab === 'tools' ? C.accent : 'transparent' }}>

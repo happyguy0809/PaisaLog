@@ -141,6 +141,22 @@ export function parse_sms(sender: string, body: string): parsed_sms | null {
     }
   }
 
+  // ── UPI/generic debit amount fallback ────────────────────────
+  if (!amount) {
+    const m2 = body.match(/debited(?:\s+by|\s+with)?\s+(?:Rs\.?|INR|\u20b9)?\s*([\d,]+(?:\.\d{1,2})?)/i);
+    if (m2) amount = Math.round(parseFloat(m2[1].replace(/,/g,'')) * 100);
+  }
+  // ── Account suffix from UPI format ───────────────────────────
+  if (!acct_suffix) {
+    const m3 = body.match(/(?:A\/C\s+X+|Acct\s+X+|a\/c\s+no\.?\s+X+)(\d{3,6})/i);
+    if (m3) acct_suffix = m3[1].slice(-4);
+  }
+  // ── Merchant from trf to / paid to format ────────────────────
+  if (!merchant) {
+    const m4 = body.match(/(?:trf\s+to|transfer\s+to|paid\s+to)\s+([A-Za-z][A-Za-z\s]{2,25}?)(?:\s*[,.]|Ref|$)/i);
+    if (m4) merchant = m4[1].trim();
+  }
+
   // ── Refund / reversal / cashback detection ──────────────
   const is_refund    = /refund|reversal|reversed|cashback|cash back|money back/i.test(body);
   const refund_type  = /cashback|cash back/i.test(body) ? 'cashback'

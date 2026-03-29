@@ -9,6 +9,7 @@ pub mod cash;
 pub mod investments;
 pub mod children;
 pub mod export;
+pub mod sms_review;
 
 use axum::{routing::{get, post, patch, delete}, Router};
 use sqlx::PgPool;
@@ -91,6 +92,12 @@ pub fn build_router(state: AppState) -> Router {
         .route("/refunds",        get(refunds::list).post(refunds::create))
         .route("/refunds/:id",    patch(refunds::update_status))
 
+
+        // ── SMS Review queue ─────────────────────────────────
+        .route("/sms/review",              post(sms_review::submit))
+        .route("/sms/review",              get(sms_review::list))
+        .route("/sms/review/:id/approve",  patch(sms_review::approve))
+        .route("/sms/review/:id/reject",   patch(sms_review::reject))
         .with_state(state)
 }
 
