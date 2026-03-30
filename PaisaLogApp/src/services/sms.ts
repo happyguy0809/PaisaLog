@@ -473,6 +473,9 @@ export async function backfill_sms(opts: {
   storage.set('sms_backfill_done',    'true');
   storage.set('sms_backfill_ts',      String(Date.now()));
   storage.set('sms_backfill_created', String(created));
+  // Auto-detect transfers after scan
+  try { await Transfers.detect(); } catch (_) {}
+
   emit({ status: 'done', created });
   return { processed: to_submit.length, skipped: prog.skipped, created };
 }

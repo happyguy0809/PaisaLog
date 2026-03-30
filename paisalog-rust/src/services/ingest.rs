@@ -220,6 +220,14 @@ async fn log_signal(
         result.acct_suffix.as_deref(),
     ).await?;
 
+    // Auto-detect transfers after inserting new transaction
+    {
+        let pool2 = pool.clone();
+        let uid = input.user_id;
+        tokio::spawn(async move {
+            let _ = crate::services::transfer_detection::detect_transfers(&pool2, uid).await;
+        });
+    }
     Ok(id)
 }
 

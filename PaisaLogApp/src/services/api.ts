@@ -99,6 +99,8 @@ export const User = {
 
 // ─── Transactions ────────────────────────────────────────────────
 export interface Txn {
+  is_transfer?:      boolean;
+  transfer_pair_id?: number;
   id: number; user_id: number; household_id: number | null;
   amount: number; txn_type: 'debit' | 'credit' | 'refund';
   merchant: string | null; category: string | null; note: string | null;
@@ -353,4 +355,9 @@ export const SmsReview = {
       method: 'PATCH',
       body: JSON.stringify({}),
     }),
+};
+
+// ─── Transfer detection ──────────────────────────────────────
+export const Transfers = {
+  detect: () => call<{ pairs_found: number }>('/transactions/detect-transfers', { method: 'POST' }),
 };

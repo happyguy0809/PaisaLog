@@ -72,6 +72,18 @@ async fn magic_link_redirect(
     axum::response::Html(html)
 }
 
+
+// ── Transfer detection endpoint ──────────────────────────────
+async fn detect_transfers_handler(
+    axum::extract::State(state): axum::extract::State<AppState>,
+    axum::Extension(user_id): axum::Extension<i32>,
+) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, String)> {
+    let pairs = crate::services::transfer_detection::detect_transfers(&state.pool, user_id)
+        .await
+        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(axum::Json(serde_json::json!({ "pairs_found": pairs })))
+}
+
 pub fn build_router(state: AppState) -> Router {
     Router::new()
         // ── Health ──────────────────────────────────────────
@@ -152,6 +164,7 @@ pub fn build_router(state: AppState) -> Router {
 
         // ── Android App Links verification ──────────────────
         .route("/.well-known/assetlinks.json", get(assetlinks))
+        .route("/transactions/detect-transfers", post(detect_transfers_handler))
         .with_state(state)
 }
 
