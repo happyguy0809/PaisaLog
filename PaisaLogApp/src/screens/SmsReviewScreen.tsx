@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   TextInput, StyleSheet, ActivityIndicator, Alert,
 } from 'react-native'
-import api from '../services/api'
+import { SmsReview } from '../services/api'
 
 interface ReviewItem {
   id: number; sender_id: string; body_preview: string
@@ -28,7 +28,7 @@ export default function SmsReviewScreen() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    try { const r = await api.get('/sms/review'); setItems(r.data) }
+    try { const r = await SmsReview.list(); setItems(r.data) }
     catch { Alert.alert('Error', 'Could not load review queue') }
     finally { setLoading(false) }
   }, [])
@@ -37,7 +37,7 @@ export default function SmsReviewScreen() {
 
   const approve = async (item: ReviewItem) => {
     try {
-      await api.patch(`/sms/review/${item.id}/approve`, {
+      await SmsReview.approve(item.id, {
         account_id: 1,
         amount:   edits.amount   ? Math.round(parseFloat(edits.amount) * 100) : item.parsed_amount,
         currency: edits.currency ?? item.parsed_currency,
@@ -54,7 +54,7 @@ export default function SmsReviewScreen() {
     Alert.alert('Reject SMS', 'Mark as non-transaction noise?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Reject', style: 'destructive', onPress: async () => {
-        await api.patch(`/sms/review/${item.id}/reject`)
+        await SmsReview.reject(item.id)
         setItems(p => p.filter(i => i.id !== item.id))
         setSelected(null)
       }},

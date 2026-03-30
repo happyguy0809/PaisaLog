@@ -96,11 +96,11 @@ export function parse_sms(sender: string, body: string): parsed_sms | null {
 
   // Merchant — look for "at MERCHANT" or "to MERCHANT"
   const merchant_match = body.match(/(?:at|to|from)\s+([A-Za-z0-9 ]{2,30}?)(?:\s+on|\s+via|\s+ref|\.|$)/i);
-  const merchant = merchant_match ? merchant_match[1].trim() : null;
+  let merchant = merchant_match ? merchant_match[1].trim() : null;
 
   // Account suffix — XX1234 or ending 1234
   const acct_match = body.match(/(?:XX|x{2}|ending\s)(\d{4})/i);
-  const acct_suffix = acct_match ? acct_match[1] : null;
+  let acct_suffix = acct_match ? acct_match[1] : null;
 
   // ── Foreign currency detection ──────────────────────────
   // Detect non-INR currency symbols and codes in SMS
@@ -168,19 +168,35 @@ export function parse_sms(sender: string, body: string): parsed_sms | null {
   // Common patterns: "RRN 123456789012", "Ref No 123456789012", "UPI Ref 123456789012"
   const rrn_match = body.match(
     /(?:RRN|Ref(?:erence)?(?:\s+No\.?)?|UPI\s+Ref(?:\s+No\.?)?)[:\s]+(\d{12})/i
-  ) || body.match(/(\d{12})/);
+  ) || body.match(/(\d{12})/);
   const rrn = rrn_match ? rrn_match[1] : null;
 
   // ARN — 23-digit Acquirer Reference Number, bank-generated at refund/capture
   // Typically starts with a letter+digits pattern or pure 23-digit string
   const arn_match = body.match(
     /(?:ARN|Acquirer\s+Ref(?:erence)?)[:\s]+([A-Z0-9]{23})/i
-  ) || body.match(/([A-Z]{2}\d{21})/i);
+  ) || body.match(/([A-Z]{2}\d{21})/i);
   const arn = arn_match ? arn_match[1].toUpperCase() : null;
 
   // Generic reference — catch-all for other ref numbers
   const ref_match = body.match(/(?:Ref(?:erence)?(?:\s+No\.?)?|Transaction\s+ID)[:\s]+([A-Z0-9]{8,20})/i);
   const reference_no = (!rrn && !arn && ref_match) ? ref_match[1] : null;
+
+  // Detect payment method
+  const payment_method =
+    /upi|vpa|gpay|phonepe|paytm/i.test(body)      ? 'upi'
+    : /emi/i.test(body)                             ? 'emi'
+    : /netbanking|net.banking|neft|rtgs|imps/i.test(body) ? 'netbanking'
+    : /wallet/i.test(body)                          ? 'wallet'
+    : /atm|cash/i.test(body)                        ? 'cash'
+    : /card|credit|debit/i.test(body)               ? 'card'
+    : null;
+
+  // Available balance
+  const bal_match = body.match(/(?:Avl\.?\s*Bal(?:ance)?|Available\s+Balance)[:\s]*(?:Rs\.?|INR|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i);
+  const available_balance = bal_match
+    ? Math.round(parseFloat(bal_match[1].replace(/,/g, '')) * 100)
+    : null;
 
   return { amount, txn_type, merchant, acct_suffix, sender, body,
            original_currency, original_amount,
@@ -337,7 +353,7 @@ export function is_financial_sender(sender: string, body?: string): boolean {
   // If body is provided, detect by content (more reliable)
   if (body) {
     // Reject OTPs first
-    if (/OTP|one.?time.?pass/i.test(body)) return false;
+    if (/OTP|one.?time.?pass/i.test(body)) return false;
     // Reject promotional patterns
     if (/offer|discount|cashback.*earn|click here|visit us|unsubscribe/i.test(body) &&
         !(/debited|credited|spent|withdrawn/i.test(body))) return false;
@@ -402,7 +418,13 @@ export async function backfill_sms(opts: {
   } catch {}
   const to_submit: any[] = [];
   for (const msg of financial) {
-    const parsed = parse_sms(msg.sender ?? '', msg.body ?? '');
+    let parsed: any = null;
+    try {
+      parsed = parse_sms(msg.sender ?? '', msg.body ?? '');
+    } catch (parseErr: any) {
+      console.error('[SCAN] parse_sms threw:', parseErr?.message, 'sender:', msg.sender, 'body:', msg.body?.slice(0,50));
+      emit({ skipped: prog.skipped + 1 }); continue;
+    }
     if (!parsed) { emit({ skipped: prog.skipped + 1 }); continue; }
     to_submit.push({
       local_id:          `sms_${msg.timestamp}_${parsed.amount}`,
@@ -425,7 +447,7 @@ export async function backfill_sms(opts: {
         sms_timestamp_ms: msg.timestamp,
       },
       raw_sms_body:    msg.body ?? '',
-      payment_method:  parsed.payment_method ?? undefined,
+      payment_method:  (parsed as any)?.payment_method ?? undefined,
     });
     emit({ parsed: prog.parsed + 1 });
   }

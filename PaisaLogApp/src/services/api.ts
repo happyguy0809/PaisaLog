@@ -74,7 +74,7 @@ export const Auth = {
       method: 'POST', body: JSON.stringify({ email, locale: 'en-IN' }),
     }),
   verify: (token: string, uid: number) =>
-    call<{ access_token: string; refresh_token: string }>(`/auth/verify?token=${token}&uid=${uid}`),
+    call<{ access_token: string; refresh_token: string }>(`/auth/confirm?token=${token}&uid=${uid}`),
   logout: () => call<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
 };
 
@@ -333,3 +333,24 @@ function qs(p: Record<string, any>): string {
     .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
     .join('&');
 }
+
+// ─── SMS Review queue ────────────────────────────────────────
+export const SmsReview = {
+  submit: (payload: object) =>
+    call<{ id: number; status: string }>('/sms/review', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  list: () =>
+    call<any[]>('/sms/review'),
+  approve: (id: number, corrections: object) =>
+    call<{ transaction_id: number }>(`/sms/review/${id}/approve`, {
+      method: 'PATCH',
+      body: JSON.stringify(corrections),
+    }),
+  reject: (id: number) =>
+    call<{ status: string }>(`/sms/review/${id}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({}),
+    }),
+};

@@ -22,6 +22,56 @@ pub struct AppState {
     pub cfg:     Arc<Config>,
 }
 
+
+async fn assetlinks() -> axum::Json<serde_json::Value> {
+    axum::Json(serde_json::json!([{
+        "relation": ["delegate_permission/common.handle_all_urls"],
+        "target": {
+            "namespace": "android_app",
+            "package_name": "com.paisalogapp",
+            "sha256_cert_fingerprints": [
+                "FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C"
+            ]
+        }
+    }]))
+}
+
+
+// ── Magic link redirect ──────────────────────────────────────
+// Converts https magic link to custom scheme so the app opens directly
+// Email client clicks https://api.engineersindia.co.in/auth/verify?token=X&uid=Y
+// This redirects to paisalog://auth/verify?token=X&uid=Y
+async fn magic_link_redirect(
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> impl axum::response::IntoResponse {
+    let token = params.get("token").cloned().unwrap_or_default();
+    let uid   = params.get("uid").cloned().unwrap_or_default();
+    let deep_link = format!("paisalog://auth/verify?token={}&uid={}", token, uid);
+    // Return HTML that immediately redirects to the custom scheme
+    // Falls back to a tap-to-open button if auto-redirect fails
+    let html = format!(r#"<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Opening PaisaLog...</title>
+  <meta http-equiv="refresh" content="0;url={dl}">
+  <style>
+    body {{ font-family: sans-serif; text-align: center; padding: 40px; background: #F7F7F5; }}
+    a {{ display: inline-block; margin-top: 20px; padding: 14px 28px;
+         background: #2563EB; color: white; border-radius: 8px;
+         text-decoration: none; font-size: 16px; }}
+  </style>
+</head>
+<body>
+  <h2>Opening PaisaLog...</h2>
+  <p>If the app doesn't open automatically:</p>
+  <a href="{dl}">Tap to open PaisaLog</a>
+  <script>window.location.href = "{dl}";</script>
+</body>
+</html>"#, dl = deep_link);
+    axum::response::Html(html)
+}
+
 pub fn build_router(state: AppState) -> Router {
     Router::new()
         // ── Health ──────────────────────────────────────────
@@ -29,8 +79,9 @@ pub fn build_router(state: AppState) -> Router {
 
         // ── Auth ─────────────────────────────────────────────
         .route("/auth/magic",   post(auth::request_magic_link))
-        .route("/auth/verify",  get(auth::verify_magic_link))
+        .route("/auth/verify",  get(magic_link_redirect))
         .route("/auth/refresh", post(auth::refresh))
+        .route("/auth/confirm",  get(auth::verify_magic_link))
         .route("/auth/logout",  post(auth::logout))
 
         // ── User ─────────────────────────────────────────────
@@ -98,6 +149,9 @@ pub fn build_router(state: AppState) -> Router {
         .route("/sms/review",              get(sms_review::list))
         .route("/sms/review/:id/approve",  patch(sms_review::approve))
         .route("/sms/review/:id/reject",   patch(sms_review::reject))
+
+        // ── Android App Links verification ──────────────────
+        .route("/.well-known/assetlinks.json", get(assetlinks))
         .with_state(state)
 }
 
