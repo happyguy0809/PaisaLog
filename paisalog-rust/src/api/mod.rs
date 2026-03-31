@@ -76,9 +76,9 @@ async fn magic_link_redirect(
 // ── Transfer detection endpoint ──────────────────────────────
 async fn detect_transfers_handler(
     axum::extract::State(state): axum::extract::State<AppState>,
-    axum::Extension(user_id): axum::Extension<i32>,
+    auth: crate::middleware::auth::AuthUser,
 ) -> Result<axum::Json<serde_json::Value>, (axum::http::StatusCode, String)> {
-    let pairs = crate::services::transfer_detection::detect_transfers(&state.pool, user_id)
+    let pairs = crate::services::transfer_detection::detect_transfers(&state.pool, auth.user_id)
         .await
         .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(axum::Json(serde_json::json!({ "pairs_found": pairs })))
