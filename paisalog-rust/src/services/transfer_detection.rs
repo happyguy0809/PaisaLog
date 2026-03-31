@@ -12,8 +12,11 @@ const TRANSFER_KEYWORDS: &[&str] = &[
 fn looks_like_transfer(merchant: Option<&str>) -> bool {
     let m = match merchant {
         Some(m) if !m.is_empty() => m.to_lowercase(),
-        _ => return true,
+        _ => return false,
     };
+    // Pure digits or phone numbers = UPI/IMPS ref (e.g. "9215676766")
+    if m.chars().all(|c| c.is_ascii_digit()) { return true; }
+    // Known transfer keywords
     TRANSFER_KEYWORDS.iter().any(|kw| m.contains(kw))
 }
 
@@ -27,6 +30,7 @@ pub async fn detect_transfers(pool: &PgPool, user_id: i32) -> anyhow::Result<i32
           AND txn_type = 'debit'
           AND (is_transfer IS NULL OR is_transfer = false)
           AND deleted_at IS NULL
+          AND (account_type IS NULL OR account_type != 'credit_card')
         ORDER BY created_at DESC
         LIMIT 500
         "#,
@@ -51,6 +55,7 @@ pub async fn detect_transfers(pool: &PgPool, user_id: i32) -> anyhow::Result<i32
               AND ABS(EXTRACT(EPOCH FROM (created_at - $4))) <= 3600
               AND (is_transfer IS NULL OR is_transfer = false)
               AND deleted_at IS NULL
+              AND (account_type IS NULL OR account_type != 'credit_card')
               AND id != $5
             ORDER BY ABS(amount - $6),
                      ABS(EXTRACT(EPOCH FROM (created_at - $4)))
@@ -68,14 +73,18 @@ pub async fn detect_transfers(pool: &PgPool, user_id: i32) -> anyhow::Result<i32
 
         let credit = match credit { Some(c) => c, None => continue };
 
-        let debit_looks  = looks_like_transfer(debit.merchant.as_deref());
-        let credit_looks = looks_like_transfer(credit.merchant.as_deref());
-        let same_acct    = debit.acct_suffix.is_some()
-                        && debit.acct_suffix == credit.acct_suffix;
+        let ds = debit.acct_suffix.as_deref().unwrap_or("");
+        let cs = credit.acct_suffix.as_deref().unwrap_or("");
+        let diff_accounts = !ds.is_empty() && !cs.is_empty() && ds != cs;
 
-        if !debit_looks && !credit_looks && !same_acct {
-            continue;
-        }
+        // Debit merchant must NOT be a real merchant (e.g. Zepto, IRCTC, Zomato)
+        // Only pure transfer keywords allowed on debit side
+        let debit_is_transfer = looks_like_transfer(debit.merchant.as_deref());
+        if !debit_is_transfer { continue; }
+
+        // Credit side: either different account OR looks like transfer
+        let credit_is_transfer = looks_like_transfer(credit.merchant.as_deref());
+        if !diff_accounts && !credit_is_transfer { continue; }
 
         // Mark debit
         sqlx::query!(

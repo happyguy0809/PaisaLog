@@ -955,3 +955,12 @@ Detect financial SMS by what they SAY, not who sent them:
 - Device syncs this weekly (lightweight, ~100KB)
 - Used ONLY for display purposes (showing "SBI Credit Card" instead of "AD-SBICRD-S")
 - Never used for filtering — content always wins
+
+## BELIEF 22: Wallet top-up transfer detection (Future)
+Wallet top-ups (Amazon Pay, Paytm, PhonePe) from bank accounts are technically
+transfers, not expenses. However, distinguishing wallet top-ups from real purchases
+at the same merchant (Amazon orders vs Amazon Pay top-ups) requires additional
+signals beyond what SMS provides today.
+Current state: wallet transactions are counted as expenses.
+Future: detect via UPI VPA patterns (amazonpay@apl vs amazon.in) or explicit
+"wallet" keyword in SMS body. Phase 2 work.

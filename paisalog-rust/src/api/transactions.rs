@@ -651,7 +651,8 @@ pub async fn deleted_list(
             local_id, created_at,
             is_hidden, hidden_from_family, hidden_until, exclude_from_totals,
             tz_offset, original_amount, original_currency, fx_rate_at_entry,
-            metadata, raw_sms_body, raw_email_body, payment_method, account_type
+            metadata, raw_sms_body, raw_email_body, payment_method, account_type,
+            COALESCE(is_transfer, false) as "is_transfer!", transfer_pair_id
         FROM transactions
         WHERE user_id = $1
           AND deleted_at IS NOT NULL
