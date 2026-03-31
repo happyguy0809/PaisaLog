@@ -178,3 +178,4 @@ async fn health(
         "ts":     chrono::Utc::now().to_rfc3339(),
     }))
 }
+// merchant enrichment endpoint added below in merchants module
