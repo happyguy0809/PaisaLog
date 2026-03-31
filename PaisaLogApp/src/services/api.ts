@@ -6,9 +6,7 @@ export const storage = new MMKV({ id: 'paisalog' });
 // ─── Backend URL ────────────────────────────────────────────────
 // Same machine: Android emulator uses 10.0.2.2 for host localhost
 // Physical phone on same LAN: use your machine's LAN IP directly
-const BASE = __DEV__
-  ? 'https://api.engineersindia.co.in'  // Cloudflare tunnel — dev
-  : 'https://api.paisalog.in';                   // production
+const BASE = 'https://api.engineersindia.co.in';  // Cloudflare tunnel
 
 // ─── Token store ────────────────────────────────────────────────
 export const Tok = {

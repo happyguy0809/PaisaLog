@@ -92,6 +92,7 @@ function TxnTray({ title, txns, visible, onClose }: any) {
           ItemSeparatorComponent={() => <Divider />}
           renderItem={({ item: t }: any) => {
             const isD = t.txn_type === 'debit';
+            if (t.is_transfer) return;
             const col = t.is_investment ? CAT.investment : isD ? CAT.expense : CAT.income;
             return (
               <TouchableOpacity activeOpacity={0.7} onPress={() => { onClose(); nav.navigate('TransactionDetail', { txnId: t.id, txn: t }); }}>
@@ -131,7 +132,8 @@ function RecentTxns({ all_txns }: any) {
       <T.Cap style={{ marginBottom: sp[2], letterSpacing: 0.5 }}>RECENT TRANSACTIONS</T.Cap>
       <Card padding={0} style={{ overflow: 'hidden' }}>
         {visible.map((t: any, i: number) => {
-          const isD   = t.txn_type === 'debit';
+          if (t.is_transfer) return;
+            const isD   = t.txn_type === 'debit';
           const isInv = t.is_investment;
           const col   = isInv ? CAT.investment : isD ? CAT.expense : CAT.income;
           const sign  = isD ? '−' : '+';

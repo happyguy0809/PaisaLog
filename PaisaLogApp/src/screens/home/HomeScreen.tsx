@@ -348,10 +348,12 @@ export function HomeScreen() {
                 : (recentTxns ?? []).map((txn, i, arr) => {
                     const isLast  = i === arr.length - 1;
                     const isInvest = txn.is_investment;
-                    const amtColor = isInvest ? Colors.invest.text :
+                    const isTransfer = txn.is_transfer;
+                    const amtColor = isTransfer ? Colors.text.secondary :
+                                    isInvest ? Colors.invest.text :
                                     txn.txn_type === 'debit' ? Colors.spend.text :
                                     Colors.invest.text;
-                    const sign = txn.txn_type === 'debit' ? '−' : '+';
+                    const sign = isTransfer ? '' : txn.txn_type === 'debit' ? '−' : '+';
 
                     const renderDelete = () => (
                         <TouchableOpacity
@@ -371,7 +373,7 @@ export function HomeScreen() {
                           {/* Icon */}
                           <View style={styles.txnIconWrap}>
                             <Text style={styles.txnIconText}>
-                              {txn.is_investment ? '📈' : txn.txn_type === 'credit' ? '↓' : '↑'}
+                              {txn.is_investment ? '📈' : txn.is_transfer ? '⇄' : txn.txn_type === 'credit' ? '↓' : '↑'}
                             </Text>
                           </View>
                           {/* Content */}
@@ -380,7 +382,7 @@ export function HomeScreen() {
                               style={{ color: Colors.text.primary, fontFamily: Fonts.ui.medium }}
                               numberOfLines={1}
                             >
-                              {normaliseMerchant(txn.merchant) || (txn.txn_type === 'credit' ? 'Received' : 'Payment')}
+                              {txn.is_transfer ? 'Transfer' : normaliseMerchant(txn.merchant) || (txn.txn_type === 'credit' ? 'Received' : 'Payment')}
                             </Small>
                             <Caption>{format_date(txn.txn_date, 'D MMM')}</Caption>
                           </View>

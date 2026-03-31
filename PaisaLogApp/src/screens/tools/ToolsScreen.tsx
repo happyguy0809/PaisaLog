@@ -455,7 +455,7 @@ function SubscriptionsCard() {
 }
 
 export function ToolsScreen() {
-  const [toolTab, setToolTab] = React.useState<'tools'|'accounts'>('tools');
+  const [toolTab, setToolTab] = React.useState<'tools'|'accounts'|'transfers'>('tools');
   const nav = useNavigation<any>();
   const SECTIONS = [
     { title: 'MONEY', items: [
@@ -485,8 +485,19 @@ export function ToolsScreen() {
           <Text style={{ fontFamily: F.medium, fontSize: 13,
             color: toolTab === 'accounts' ? C.accent : C.textTertiary }}>Accounts</Text>
         </TouchableOpacity>
+        <TouchableOpacity onPress={() => setToolTab('transfers')}
+          style={{ flex: 1, alignItems: 'center', paddingVertical: sp[2],
+            borderBottomWidth: 2, borderBottomColor: toolTab === 'transfers' ? C.accent : 'transparent' }}>
+          <Text style={{ fontFamily: F.medium, fontSize: 13,
+            color: toolTab === 'transfers' ? C.accent : C.textTertiary }}>Transfers</Text>
+        </TouchableOpacity>
       </View>
-      {toolTab === 'accounts' ? (
+      {toolTab === 'transfers' ? (
+        <ScrollView contentContainerStyle={{ padding: sp[4] }} showsVerticalScrollIndicator={false}>
+          <TransfersCard />
+          <Spacer h={sp[10]} />
+        </ScrollView>
+      ) : toolTab === 'accounts' ? (
         <ScrollView contentContainerStyle={{ padding: sp[4] }} showsVerticalScrollIndicator={false}>
           <AccountsCard />
           <Spacer h={sp[10]} />
@@ -533,3 +544,35 @@ const s = StyleSheet.create({
   header: { paddingHorizontal: sp[4], paddingVertical: sp[3], borderBottomWidth: 0.5, borderBottomColor: C.borderFaint },
   secHdr: { marginBottom: sp[2], letterSpacing: 0.5, paddingLeft: sp[1] },
 });
+
+function TransfersCard() {
+  const [txns, setTxns] = React.useState<any[]>([]);
+  const today = new Date().toISOString().split('T')[0];
+  const start = new Date(Date.now() - 90*24*3600*1000).toISOString().split('T')[0];
+  React.useEffect(() => {
+    Transactions.list({ start, end: today })
+      .then((data: any[]) => setTxns(data.filter((t: any) => t.is_transfer)))
+      .catch(() => {});
+  }, []);
+  if (!txns.length) return (
+    <View style={{ padding: 20, alignItems: 'center' }}>
+      <T.Small style={{ color: C.textTertiary }}>No transfers found</T.Small>
+    </View>
+  );
+  return (
+    <View>
+      {txns.map((t: any) => (
+        <View key={t.id} style={{ flexDirection: 'row', justifyContent: 'space-between',
+          paddingVertical: sp[3], borderBottomWidth: 0.5, borderBottomColor: C.borderFaint }}>
+          <View>
+            <T.Small style={{ fontFamily: F.medium }}>
+              ⇄ {t.txn_type === 'debit' ? 'From' : 'To'} XXXX{t.acct_suffix ?? '????'}
+            </T.Small>
+            <T.Cap style={{ color: C.textTertiary }}>{t.txn_date}</T.Cap>
+          </View>
+          <T.Small>{fmt_money(t.amount, 'INR', {})}</T.Small>
+        </View>
+      ))}
+    </View>
+  );
+}
