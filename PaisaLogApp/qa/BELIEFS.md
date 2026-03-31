@@ -964,3 +964,52 @@ signals beyond what SMS provides today.
 Current state: wallet transactions are counted as expenses.
 Future: detect via UPI VPA patterns (amazonpay@apl vs amazon.in) or explicit
 "wallet" keyword in SMS body. Phase 2 work.
+
+## BELIEF 23: Data Residency Architecture (Phase 2)
+Current state: ALL data lives on the user's phone (local Postgres via backend on Proxmox).
+Target state: Split data across two tiers based on sensitivity.
+
+### Server-side tables (non-sensitive, shared enrichment):
+- `merchants` — canonical merchant registry (name, category, logo, aliases)
+- `merchant_aliases` — raw SMS merchant strings → canonical merchant mapping
+- `categories` — category taxonomy (id, name, parent, icon, color)
+- `spend_benchmarks` — anonymized spend norms by category + city tier
+- `spend_contributions` — anonymous weekly spend buckets (opt-in, Tier 2)
+- `users` — email, plan, consent flags only (NO transaction data)
+- `households` — household metadata only
+
+### Phone-side (encrypted, never leaves device without consent):
+- `transactions` — full transaction history (Tier 0 — raw SMS body, amount, merchant)
+- `customer_details` — PII (name, DOB, city, gender, income bracket)
+- `user_key_parts` — 4-part encryption key fragments
+- `raw_sms_body` — never transmitted in plaintext
+
+### Migration path:
+1. Move merchant/category enrichment to server (Phase 2)
+2. Implement 4-part key encryption for transaction data (Phase 0 remaining)
+3. Tier 2 anonymous contributions — client computes weekly buckets, sends only aggregates
+
+## BELIEF 24: Merchant Enrichment Framework
+The current category system is rule-based (regex on merchant name + SMS body).
+Target: server-side merchant registry that maps raw SMS strings to canonical merchants.
+
+### How it works:
+1. During SMS ingest, raw merchant string extracted (e.g. "ZEPTOMARKETPLACEPRIVATE")
+2. Lookup in `merchant_aliases` → canonical merchant (e.g. "Zepto")
+3. Canonical merchant has pre-assigned category, logo URL, display name
+4. Fallback: rule-based categorization (current system)
+5. User corrections fed back to improve aliases (crowdsourced, anonymized)
+
+### Tables needed:
+- `merchants(id, canonical_name, display_name, category, logo_url, website, country)`
+- `merchant_aliases(id, raw_string, merchant_id, confidence, source)`
+- `category_rules(id, pattern, category, priority, match_type)`
+
+## BELIEF 25: Customer Profile Data Strategy
+customer_details table should capture:
+- age_bracket (not DOB) — 18-25, 26-30, 31-35, 36-40, 41-50, 51+
+- city_tier — metro/tier1/tier2/tier3 (derived from city, not stored raw)
+- income_bracket — <3L, 3-6L, 6-10L, 10-20L, 20L+ annual
+- gender — optional
+- occupation — optional (salaried/self-employed/business/student/retired)
+This data powers spend benchmarks. Never used for ads. Never sold.

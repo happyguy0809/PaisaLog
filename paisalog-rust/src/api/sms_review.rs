@@ -33,7 +33,7 @@ pub struct SubmitReviewReq {
 
 pub async fn submit(
     State(state): State<AppState>,
-    axum::Extension(user_id): axum::Extension<i32>,
+    auth: crate::middleware::auth::AuthUser,
     Json(r): Json<SubmitReviewReq>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
 
@@ -50,7 +50,7 @@ pub async fn submit(
          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
          RETURNING id",
     )
-    .bind(user_id).bind(&r.sender_id).bind(&r.raw_body).bind(&r.masked_body)
+    .bind(auth.user_id).bind(&r.sender_id).bind(&r.raw_body).bind(&r.masked_body)
     .bind(&r.parse_trace).bind(r.overall_conf)
     .bind(&r.mandatory_missing).bind(&r.optional_missing)
     .bind(r.parsed_amount).bind(&r.parsed_currency).bind(&r.parsed_account)
@@ -67,7 +67,7 @@ pub async fn submit(
 
 pub async fn list(
     State(state): State<AppState>,
-    axum::Extension(user_id): axum::Extension<i32>,
+    auth: crate::middleware::auth::AuthUser,
 ) -> Result<Json<Value>, (StatusCode, String)> {
 
     let rows = sqlx::query!(
@@ -86,7 +86,7 @@ pub async fn list(
            CASE WHEN mandatory_missing != '{}' THEN 0 ELSE 1 END,
            overall_conf ASC, created_at DESC
          LIMIT 100"#,
-        user_id
+        auth.user_id
     )
     .fetch_all(&state.pool)
     .await
@@ -128,14 +128,14 @@ pub struct ApproveReq {
 
 pub async fn approve(
     State(state): State<AppState>,
-    axum::Extension(user_id): axum::Extension<i32>,
+    auth: crate::middleware::auth::AuthUser,
     Path(review_id): Path<i32>,
     Json(req): Json<ApproveReq>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
 
     let item = sqlx::query!(
         "SELECT * FROM sms_parse_review WHERE id=$1 AND user_id=$2",
-        review_id, user_id
+        review_id, auth.user_id
     )
     .fetch_optional(&state.pool)
     .await
@@ -165,7 +165,7 @@ pub async fn approve(
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false,$9,$10)
          RETURNING id",
     )
-    .bind(user_id).bind(req.account_id).bind(amount).bind(&currency)
+    .bind(auth.user_id).bind(req.account_id).bind(amount).bind(&currency)
     .bind(&merchant).bind(&action).bind(txn_date)
     .bind(&item.raw_body).bind(&metadata).bind(&req.note)
     .fetch_one(&state.pool)
@@ -192,7 +192,7 @@ pub async fn approve(
 
 pub async fn reject(
     State(state): State<AppState>,
-    axum::Extension(user_id): axum::Extension<i32>,
+    auth: crate::middleware::auth::AuthUser,
     Path(review_id): Path<i32>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
 
@@ -200,7 +200,7 @@ pub async fn reject(
         "UPDATE sms_parse_review
          SET status='rejected', reviewed_at=now()
          WHERE id=$1 AND user_id=$2",
-        review_id, user_id
+        review_id, auth.user_id
     )
     .execute(&state.pool)
     .await
